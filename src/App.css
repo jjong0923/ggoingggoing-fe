@@ -1,0 +1,44 @@
+.phone-shell {
+  position: relative;
+  border-radius: 38px;
+  padding: 12px;
+  background: linear-gradient(180deg, #fffdf8, #f7f0e6);
+  box-shadow:
+    0 25px 80px rgba(78, 54, 20, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.phone-shell::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 30px;
+  border: 1px solid rgba(141, 122, 87, 0.14);
+  pointer-events: none;
+}
+
+.phone-screen {
+  position: relative;
+  min-height: 740px;
+  overflow: hidden;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.88), transparent 34%),
+    linear-gradient(180deg, #fffefb, #f8f3ea 55%, #f5eee3);
+}
+
+.masonry-grid {
+  column-count: 2;
+  column-gap: 12px;
+}
+
+.masonry-item {
+  break-inside: avoid;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 768px) {
+  .phone-screen {
+    min-height: 680px;
+  }
+}
