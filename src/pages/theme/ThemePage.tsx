@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
 import {
-  SearchIcon,
-  SlidersIcon,
-  UserCircleIcon,
-} from "../../shared/ui/AppIcons";
+  clearAuthSession,
+  getRefreshToken,
+  useAuthUser,
+} from "../../shared/lib/authSession";
+import { SearchIcon, SlidersIcon } from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
 import { ShowcaseLayout } from "../../shared/ui/ShowcaseLayout";
@@ -77,8 +78,24 @@ const themeGroups: ThemeGroup[] = [
 ];
 
 const regionOptions = ["전국", "수도권", "부산", "대구", "강원", "제주"];
-const searchRegionOptions = ["전국", "수도권", "부산/경남", "강원", "제주", "전라", "충청"];
-const searchThemeOptions = ["맛집", "명소", "루트", "힐링", "등산", "계곡", "축제"];
+const searchRegionOptions = [
+  "전국",
+  "수도권",
+  "부산/경남",
+  "강원",
+  "제주",
+  "전라",
+  "충청",
+];
+const searchThemeOptions = [
+  "맛집",
+  "명소",
+  "루트",
+  "힐링",
+  "등산",
+  "계곡",
+  "축제",
+];
 const searchTypeOptions = ["당일치기", "1박 2일", "혼자", "커플", "가족"];
 const recentSearches = ["성심당", "속초 물회", "부산 당일치기"];
 const trendingKeywords = [
@@ -91,88 +108,424 @@ const sortOptions = ["추천순", "인기순", "최신순"] as const;
 
 const feedCardsBySubtheme: Record<string, FeedCard[]> = {
   "고기/구이": [
-    { id: "theme-food-1", title: "문현가", subtitle: "한우구이", location: "부산 진구", likeCount: "842" },
-    { id: "theme-food-2", title: "초록석", subtitle: "숯불 돼지구이", location: "포항시", likeCount: "516" },
-    { id: "theme-food-3", title: "대구 뭉티기", subtitle: "로컬 인기집", location: "대구 중구", likeCount: "774" },
-    { id: "theme-food-4", title: "제주 흑돼지", subtitle: "오션뷰 구이", location: "제주시", likeCount: "691" },
+    {
+      id: "theme-food-1",
+      title: "문현가",
+      subtitle: "한우구이",
+      location: "부산 진구",
+      likeCount: "842",
+    },
+    {
+      id: "theme-food-2",
+      title: "초록석",
+      subtitle: "숯불 돼지구이",
+      location: "포항시",
+      likeCount: "516",
+    },
+    {
+      id: "theme-food-3",
+      title: "대구 뭉티기",
+      subtitle: "로컬 인기집",
+      location: "대구 중구",
+      likeCount: "774",
+    },
+    {
+      id: "theme-food-4",
+      title: "제주 흑돼지",
+      subtitle: "오션뷰 구이",
+      location: "제주시",
+      likeCount: "691",
+    },
   ],
   "면/국수": [
-    { id: "theme-noodle-1", title: "밀면 거리", subtitle: "시원한 부산 밀면", location: "부산 중구", likeCount: "423" },
-    { id: "theme-noodle-2", title: "칼국수 집", subtitle: "현지인 추천", location: "강릉시", likeCount: "287" },
-    { id: "theme-noodle-3", title: "잔치국수 골목", subtitle: "가볍게 한 끼", location: "전주시", likeCount: "198" },
-    { id: "theme-noodle-4", title: "비빔국수 맛집", subtitle: "매콤한 별미", location: "수원시", likeCount: "355" },
+    {
+      id: "theme-noodle-1",
+      title: "밀면 거리",
+      subtitle: "시원한 부산 밀면",
+      location: "부산 중구",
+      likeCount: "423",
+    },
+    {
+      id: "theme-noodle-2",
+      title: "칼국수 집",
+      subtitle: "현지인 추천",
+      location: "강릉시",
+      likeCount: "287",
+    },
+    {
+      id: "theme-noodle-3",
+      title: "잔치국수 골목",
+      subtitle: "가볍게 한 끼",
+      location: "전주시",
+      likeCount: "198",
+    },
+    {
+      id: "theme-noodle-4",
+      title: "비빔국수 맛집",
+      subtitle: "매콤한 별미",
+      location: "수원시",
+      likeCount: "355",
+    },
   ],
   "국밥/찌개": [
-    { id: "theme-soup-1", title: "돼지국밥 골목", subtitle: "진한 국물", location: "부산 서면", likeCount: "640" },
-    { id: "theme-soup-2", title: "순두부 마을", subtitle: "아침 인기 코스", location: "강릉시", likeCount: "402" },
-    { id: "theme-soup-3", title: "해장국 본점", subtitle: "로컬 단골집", location: "제주시", likeCount: "331" },
-    { id: "theme-soup-4", title: "김치찌개 식당", subtitle: "든든한 한 끼", location: "서울 마포", likeCount: "219" },
+    {
+      id: "theme-soup-1",
+      title: "돼지국밥 골목",
+      subtitle: "진한 국물",
+      location: "부산 서면",
+      likeCount: "640",
+    },
+    {
+      id: "theme-soup-2",
+      title: "순두부 마을",
+      subtitle: "아침 인기 코스",
+      location: "강릉시",
+      likeCount: "402",
+    },
+    {
+      id: "theme-soup-3",
+      title: "해장국 본점",
+      subtitle: "로컬 단골집",
+      location: "제주시",
+      likeCount: "331",
+    },
+    {
+      id: "theme-soup-4",
+      title: "김치찌개 식당",
+      subtitle: "든든한 한 끼",
+      location: "서울 마포",
+      likeCount: "219",
+    },
   ],
   베이커리: [
-    { id: "theme-bakery-1", title: "성심당", subtitle: "대표 빵집", location: "대전 중구", likeCount: "993" },
-    { id: "theme-bakery-2", title: "오션 베이크", subtitle: "바다 앞 디저트", location: "속초시", likeCount: "412" },
-    { id: "theme-bakery-3", title: "한옥 빵집", subtitle: "감성 공간", location: "전주시", likeCount: "266" },
-    { id: "theme-bakery-4", title: "크림도넛 하우스", subtitle: "줄서는 빵집", location: "대구 중구", likeCount: "387" },
+    {
+      id: "theme-bakery-1",
+      title: "성심당",
+      subtitle: "대표 빵집",
+      location: "대전 중구",
+      likeCount: "993",
+    },
+    {
+      id: "theme-bakery-2",
+      title: "오션 베이크",
+      subtitle: "바다 앞 디저트",
+      location: "속초시",
+      likeCount: "412",
+    },
+    {
+      id: "theme-bakery-3",
+      title: "한옥 빵집",
+      subtitle: "감성 공간",
+      location: "전주시",
+      likeCount: "266",
+    },
+    {
+      id: "theme-bakery-4",
+      title: "크림도넛 하우스",
+      subtitle: "줄서는 빵집",
+      location: "대구 중구",
+      likeCount: "387",
+    },
   ],
   해산물: [
-    { id: "theme-seafood-1", title: "수산시장 골목", subtitle: "회와 해산물", location: "부산 중구", likeCount: "529" },
-    { id: "theme-seafood-2", title: "물회 명가", subtitle: "여름 인기", location: "속초시", likeCount: "618" },
-    { id: "theme-seafood-3", title: "갈치조림 집", subtitle: "제주 로컬", location: "서귀포시", likeCount: "344" },
-    { id: "theme-seafood-4", title: "조개구이 거리", subtitle: "야식 코스", location: "보령시", likeCount: "271" },
+    {
+      id: "theme-seafood-1",
+      title: "수산시장 골목",
+      subtitle: "회와 해산물",
+      location: "부산 중구",
+      likeCount: "529",
+    },
+    {
+      id: "theme-seafood-2",
+      title: "물회 명가",
+      subtitle: "여름 인기",
+      location: "속초시",
+      likeCount: "618",
+    },
+    {
+      id: "theme-seafood-3",
+      title: "갈치조림 집",
+      subtitle: "제주 로컬",
+      location: "서귀포시",
+      likeCount: "344",
+    },
+    {
+      id: "theme-seafood-4",
+      title: "조개구이 거리",
+      subtitle: "야식 코스",
+      location: "보령시",
+      likeCount: "271",
+    },
   ],
   "카페/디저트": [
-    { id: "theme-dessert-1", title: "노을 카페", subtitle: "감성 오션뷰", location: "부산 영도", likeCount: "845" },
-    { id: "theme-dessert-2", title: "수플레 하우스", subtitle: "사진 스팟", location: "서울 성수", likeCount: "530" },
-    { id: "theme-dessert-3", title: "귤 디저트 카페", subtitle: "제주 시그니처", location: "제주시", likeCount: "451" },
-    { id: "theme-dessert-4", title: "한옥 티룸", subtitle: "조용한 휴식", location: "전주시", likeCount: "239" },
+    {
+      id: "theme-dessert-1",
+      title: "노을 카페",
+      subtitle: "감성 오션뷰",
+      location: "부산 영도",
+      likeCount: "845",
+    },
+    {
+      id: "theme-dessert-2",
+      title: "수플레 하우스",
+      subtitle: "사진 스팟",
+      location: "서울 성수",
+      likeCount: "530",
+    },
+    {
+      id: "theme-dessert-3",
+      title: "귤 디저트 카페",
+      subtitle: "제주 시그니처",
+      location: "제주시",
+      likeCount: "451",
+    },
+    {
+      id: "theme-dessert-4",
+      title: "한옥 티룸",
+      subtitle: "조용한 휴식",
+      location: "전주시",
+      likeCount: "239",
+    },
   ],
   바다: [
-    { id: "theme-sea-1", title: "광안리 해변", subtitle: "야경 산책", location: "부산 수영구", likeCount: "790" },
-    { id: "theme-sea-2", title: "영금정", subtitle: "일출 명소", location: "속초시", likeCount: "690" },
-    { id: "theme-sea-3", title: "함덕 해수욕장", subtitle: "청량한 바다", location: "제주시", likeCount: "624" },
-    { id: "theme-sea-4", title: "변산 채석강", subtitle: "드라이브 코스", location: "부안군", likeCount: "211" },
+    {
+      id: "theme-sea-1",
+      title: "광안리 해변",
+      subtitle: "야경 산책",
+      location: "부산 수영구",
+      likeCount: "790",
+    },
+    {
+      id: "theme-sea-2",
+      title: "영금정",
+      subtitle: "일출 명소",
+      location: "속초시",
+      likeCount: "690",
+    },
+    {
+      id: "theme-sea-3",
+      title: "함덕 해수욕장",
+      subtitle: "청량한 바다",
+      location: "제주시",
+      likeCount: "624",
+    },
+    {
+      id: "theme-sea-4",
+      title: "변산 채석강",
+      subtitle: "드라이브 코스",
+      location: "부안군",
+      likeCount: "211",
+    },
   ],
   야경: [
-    { id: "theme-night-1", title: "남산 전망대", subtitle: "도심 야경", location: "서울 중구", likeCount: "728" },
-    { id: "theme-night-2", title: "더베이101", subtitle: "반짝이는 뷰", location: "부산 해운대", likeCount: "581" },
-    { id: "theme-night-3", title: "달맞이 전망대", subtitle: "조용한 밤", location: "대구 수성구", likeCount: "245" },
-    { id: "theme-night-4", title: "월정리 야간 산책", subtitle: "해변 조명", location: "제주시", likeCount: "319" },
+    {
+      id: "theme-night-1",
+      title: "남산 전망대",
+      subtitle: "도심 야경",
+      location: "서울 중구",
+      likeCount: "728",
+    },
+    {
+      id: "theme-night-2",
+      title: "더베이101",
+      subtitle: "반짝이는 뷰",
+      location: "부산 해운대",
+      likeCount: "581",
+    },
+    {
+      id: "theme-night-3",
+      title: "달맞이 전망대",
+      subtitle: "조용한 밤",
+      location: "대구 수성구",
+      likeCount: "245",
+    },
+    {
+      id: "theme-night-4",
+      title: "월정리 야간 산책",
+      subtitle: "해변 조명",
+      location: "제주시",
+      likeCount: "319",
+    },
   ],
   산책: [
-    { id: "theme-walk-1", title: "전주 한옥마을", subtitle: "도보 코스", location: "전주시", likeCount: "670" },
-    { id: "theme-walk-2", title: "경포호수길", subtitle: "호수 산책", location: "강릉시", likeCount: "355" },
-    { id: "theme-walk-3", title: "해운대 블루라인", subtitle: "바다 옆 산책", location: "부산 해운대", likeCount: "588" },
-    { id: "theme-walk-4", title: "숲길 둘레길", subtitle: "가벼운 힐링", location: "제천시", likeCount: "199" },
+    {
+      id: "theme-walk-1",
+      title: "전주 한옥마을",
+      subtitle: "도보 코스",
+      location: "전주시",
+      likeCount: "670",
+    },
+    {
+      id: "theme-walk-2",
+      title: "경포호수길",
+      subtitle: "호수 산책",
+      location: "강릉시",
+      likeCount: "355",
+    },
+    {
+      id: "theme-walk-3",
+      title: "해운대 블루라인",
+      subtitle: "바다 옆 산책",
+      location: "부산 해운대",
+      likeCount: "588",
+    },
+    {
+      id: "theme-walk-4",
+      title: "숲길 둘레길",
+      subtitle: "가벼운 힐링",
+      location: "제천시",
+      likeCount: "199",
+    },
   ],
   "사진 스팟": [
-    { id: "theme-photo-1", title: "감천문화마을", subtitle: "컬러풀 포인트", location: "부산 사하구", likeCount: "602" },
-    { id: "theme-photo-2", title: "산방산 뷰포인트", subtitle: "제주 대표컷", location: "서귀포시", likeCount: "533" },
-    { id: "theme-photo-3", title: "루프탑 전망", subtitle: "도심 포토존", location: "서울 용산", likeCount: "241" },
-    { id: "theme-photo-4", title: "유채꽃 길", subtitle: "봄 시즌 명소", location: "제주시", likeCount: "478" },
+    {
+      id: "theme-photo-1",
+      title: "감천문화마을",
+      subtitle: "컬러풀 포인트",
+      location: "부산 사하구",
+      likeCount: "602",
+    },
+    {
+      id: "theme-photo-2",
+      title: "산방산 뷰포인트",
+      subtitle: "제주 대표컷",
+      location: "서귀포시",
+      likeCount: "533",
+    },
+    {
+      id: "theme-photo-3",
+      title: "루프탑 전망",
+      subtitle: "도심 포토존",
+      location: "서울 용산",
+      likeCount: "241",
+    },
+    {
+      id: "theme-photo-4",
+      title: "유채꽃 길",
+      subtitle: "봄 시즌 명소",
+      location: "제주시",
+      likeCount: "478",
+    },
   ],
   "도보 루트": [
-    { id: "theme-route-1", title: "전주 반나절 루트", subtitle: "한옥마을 중심", location: "전주시", likeCount: "418" },
-    { id: "theme-route-2", title: "광안리 산책 루트", subtitle: "바다와 카페", location: "부산 수영구", likeCount: "552" },
-    { id: "theme-route-3", title: "속초 항구 루트", subtitle: "시장 + 바다", location: "속초시", likeCount: "300" },
-    { id: "theme-route-4", title: "성수 감성 코스", subtitle: "전시와 카페", location: "서울 성동", likeCount: "363" },
+    {
+      id: "theme-route-1",
+      title: "전주 반나절 루트",
+      subtitle: "한옥마을 중심",
+      location: "전주시",
+      likeCount: "418",
+    },
+    {
+      id: "theme-route-2",
+      title: "광안리 산책 루트",
+      subtitle: "바다와 카페",
+      location: "부산 수영구",
+      likeCount: "552",
+    },
+    {
+      id: "theme-route-3",
+      title: "속초 항구 루트",
+      subtitle: "시장 + 바다",
+      location: "속초시",
+      likeCount: "300",
+    },
+    {
+      id: "theme-route-4",
+      title: "성수 감성 코스",
+      subtitle: "전시와 카페",
+      location: "서울 성동",
+      likeCount: "363",
+    },
   ],
   "카페 투어": [
-    { id: "theme-cafe-1", title: "해운대 카페 4선", subtitle: "오션뷰 집중", location: "부산 해운대", likeCount: "701" },
-    { id: "theme-cafe-2", title: "대전 베이커리 루프", subtitle: "빵지순례", location: "대전 중구", likeCount: "276" },
-    { id: "theme-cafe-3", title: "제주 서쪽 카페", subtitle: "노을 타임", location: "제주시", likeCount: "499" },
-    { id: "theme-cafe-4", title: "서울 디저트 코스", subtitle: "반나절 코스", location: "서울 마포", likeCount: "324" },
+    {
+      id: "theme-cafe-1",
+      title: "해운대 카페 4선",
+      subtitle: "오션뷰 집중",
+      location: "부산 해운대",
+      likeCount: "701",
+    },
+    {
+      id: "theme-cafe-2",
+      title: "대전 베이커리 루프",
+      subtitle: "빵지순례",
+      location: "대전 중구",
+      likeCount: "276",
+    },
+    {
+      id: "theme-cafe-3",
+      title: "제주 서쪽 카페",
+      subtitle: "노을 타임",
+      location: "제주시",
+      likeCount: "499",
+    },
+    {
+      id: "theme-cafe-4",
+      title: "서울 디저트 코스",
+      subtitle: "반나절 코스",
+      location: "서울 마포",
+      likeCount: "324",
+    },
   ],
   "맛집 코스": [
-    { id: "theme-foodroute-1", title: "부산 시장 먹방", subtitle: "시장 중심", location: "부산 중구", likeCount: "653" },
-    { id: "theme-foodroute-2", title: "대구 로컬 미식", subtitle: "뭉티기와 국수", location: "대구 중구", likeCount: "391" },
-    { id: "theme-foodroute-3", title: "제주 흑돼지 코스", subtitle: "고기 집중", location: "제주시", likeCount: "514" },
-    { id: "theme-foodroute-4", title: "전주 한끼 루트", subtitle: "빵과 국밥", location: "전주시", likeCount: "208" },
+    {
+      id: "theme-foodroute-1",
+      title: "부산 시장 먹방",
+      subtitle: "시장 중심",
+      location: "부산 중구",
+      likeCount: "653",
+    },
+    {
+      id: "theme-foodroute-2",
+      title: "대구 로컬 미식",
+      subtitle: "뭉티기와 국수",
+      location: "대구 중구",
+      likeCount: "391",
+    },
+    {
+      id: "theme-foodroute-3",
+      title: "제주 흑돼지 코스",
+      subtitle: "고기 집중",
+      location: "제주시",
+      likeCount: "514",
+    },
+    {
+      id: "theme-foodroute-4",
+      title: "전주 한끼 루트",
+      subtitle: "빵과 국밥",
+      location: "전주시",
+      likeCount: "208",
+    },
   ],
   "야경 코스": [
-    { id: "theme-nightroute-1", title: "광안리 야경 루트", subtitle: "브리지 뷰", location: "부산 수영구", likeCount: "733" },
-    { id: "theme-nightroute-2", title: "서울 루프탑 나이트", subtitle: "도심 라이트", location: "서울 용산", likeCount: "448" },
-    { id: "theme-nightroute-3", title: "대구 야간 드라이브", subtitle: "전망대 포함", location: "대구 수성구", likeCount: "217" },
-    { id: "theme-nightroute-4", title: "제주 해변 야경", subtitle: "조용한 밤 산책", location: "제주시", likeCount: "302" },
+    {
+      id: "theme-nightroute-1",
+      title: "광안리 야경 루트",
+      subtitle: "브리지 뷰",
+      location: "부산 수영구",
+      likeCount: "733",
+    },
+    {
+      id: "theme-nightroute-2",
+      title: "서울 루프탑 나이트",
+      subtitle: "도심 라이트",
+      location: "서울 용산",
+      likeCount: "448",
+    },
+    {
+      id: "theme-nightroute-3",
+      title: "대구 야간 드라이브",
+      subtitle: "전망대 포함",
+      location: "대구 수성구",
+      likeCount: "217",
+    },
+    {
+      id: "theme-nightroute-4",
+      title: "제주 해변 야경",
+      subtitle: "조용한 밤 산책",
+      location: "제주시",
+      likeCount: "302",
+    },
   ],
 };
 
@@ -181,12 +534,6 @@ const tabItems = [
   { icon: "⌕", label: "탐색", href: buildPath.theme(), active: true },
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: false },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
-  {
-    icon: <UserCircleIcon className="h-[18px] w-[18px]" />,
-    label: "MY",
-    href: buildPath.my(),
-    active: false,
-  },
 ];
 
 const searchableCards = Object.values(feedCardsBySubtheme).flat();
@@ -203,7 +550,7 @@ function FilterChip({
   return (
     <button
       className={[
-        "rounded-full px-3.5 py-2 text-[13px] font-medium transition whitespace-nowrap",
+        "rounded-full px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition",
         active
           ? "bg-[#f1eeff] text-[#5f51d5] shadow-[0_8px_18px_rgba(95,81,213,0.12)]"
           : "bg-[#f7f1e8] text-slate-600 hover:bg-[#faf7f2]",
@@ -220,7 +567,9 @@ function ThemePhone() {
   const [stage, setStage] = useState<ThemeStage>("home");
   const [showFilters, setShowFilters] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [searchStage, setSearchStage] = useState<"home" | "filters" | "results">("home");
+  const [searchStage, setSearchStage] = useState<
+    "home" | "filters" | "results"
+  >("home");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchRegions, setSearchRegions] = useState<string[]>(["부산/경남"]);
   const [searchThemes, setSearchThemes] = useState<string[]>(["맛집", "명소"]);
@@ -273,7 +622,9 @@ function ThemePhone() {
   const openTheme = (themeId: string, subthemeLabel: string) => {
     setSelectedThemeId(themeId);
     setSelectedSubtheme(subthemeLabel);
-    setSelectedRegions(selectedHomeRegion === "전체" ? [] : [selectedHomeRegion]);
+    setSelectedRegions(
+      selectedHomeRegion === "전체" ? [] : [selectedHomeRegion],
+    );
     setStage("subtheme");
   };
 
@@ -306,10 +657,18 @@ function ThemePhone() {
     value: string,
     setList: (next: string[]) => void,
   ) => {
-    setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
+    setList(
+      list.includes(value)
+        ? list.filter((item) => item !== value)
+        : [...list, value],
+    );
   };
 
-  const appliedSearchFilters = [...searchRegions, ...searchThemes, ...searchTypes];
+  const appliedSearchFilters = [
+    ...searchRegions,
+    ...searchThemes,
+    ...searchTypes,
+  ];
 
   const searchResults = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
@@ -317,10 +676,15 @@ function ThemePhone() {
     return searchableCards.filter((card) => {
       const matchesKeyword =
         keyword.length === 0 ||
-        [card.title, card.subtitle, card.location].join(" ").toLowerCase().includes(keyword);
+        [card.title, card.subtitle, card.location]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword);
       const matchesRegion =
         searchRegions.length === 0 ||
-        searchRegions.some((region) => card.location.includes(region.split("/")[0] ?? region));
+        searchRegions.some((region) =>
+          card.location.includes(region.split("/")[0] ?? region),
+        );
 
       return matchesKeyword && matchesRegion;
     });
@@ -366,7 +730,7 @@ function ThemePhone() {
             {showFilters ? (
               <div className="mt-4 rounded-[24px] bg-[#fbf7f1] px-4 py-4">
                 <div>
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  <p className="text-[12px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
                     Category
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -389,7 +753,7 @@ function ThemePhone() {
                 </div>
 
                 <div className="mt-4">
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  <p className="text-[12px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
                     Region
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -431,7 +795,7 @@ function ThemePhone() {
               ))}
             </div>
 
-            <div className="no-scrollbar mt-5 flex-1 overflow-y-auto space-y-3 pr-1">
+            <div className="no-scrollbar mt-5 flex-1 space-y-3 overflow-y-auto pr-1">
               {selectedHomeRegion !== "전체" ? (
                 <div className="rounded-[18px] bg-[#fbf7f1] px-4 py-3">
                   <p className="text-[12px] font-medium text-slate-500">
@@ -455,13 +819,19 @@ function ThemePhone() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f7f1e8] text-lg">
-                        {theme.title === "맛집" ? "🍽" : theme.title === "명소" ? "🖼" : "🗺"}
+                        {theme.title === "맛집"
+                          ? "🍽"
+                          : theme.title === "명소"
+                            ? "🖼"
+                            : "🗺"}
                       </div>
                       <div>
                         <p className="text-[15px] font-semibold text-slate-900">
                           {theme.title}
                         </p>
-                        <p className="text-[11px] text-slate-500">{theme.countLabel}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {theme.countLabel}
+                        </p>
                       </div>
                     </div>
                     <span className="text-slate-400">›</span>
@@ -532,14 +902,15 @@ function ThemePhone() {
 
             <div className="no-scrollbar mt-5 flex-1 overflow-y-auto pr-1">
               <div className="rounded-[22px] bg-[#fbf7f1] px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-400 uppercase">
                   Selected Theme
                 </p>
                 <h3 className="mt-2 text-[17px] font-semibold text-slate-900">
                   {currentTheme.title} 안에서 세부 취향을 골라보세요
                 </h3>
                 <p className="mt-2 text-[12px] leading-5 text-slate-500">
-                  서브테마와 지역을 조합하면 마지막 피드가 그 기준으로 정리됩니다.
+                  서브테마와 지역을 조합하면 마지막 피드가 그 기준으로
+                  정리됩니다.
                 </p>
               </div>
 
@@ -558,7 +929,11 @@ function ThemePhone() {
                       onClick={() => setSelectedSubtheme(subtheme.label)}
                     >
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f7f1e8] text-xl">
-                        {currentTheme.title === "맛집" ? "🍢" : currentTheme.title === "명소" ? "📍" : "🛣"}
+                        {currentTheme.title === "맛집"
+                          ? "🍢"
+                          : currentTheme.title === "명소"
+                            ? "📍"
+                            : "🛣"}
                       </div>
                       <p className="mt-3 text-[14px] font-semibold text-slate-900">
                         {subtheme.label}
@@ -572,7 +947,9 @@ function ThemePhone() {
               </div>
 
               <div className="mt-6">
-                <p className="text-[12px] font-semibold text-slate-500">지역으로 좁히기</p>
+                <p className="text-[12px] font-semibold text-slate-500">
+                  지역으로 좁히기
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {regionOptions.map((region) => {
                     const active = selectedRegions.includes(region);
@@ -582,7 +959,9 @@ function ThemePhone() {
                         key={region}
                         className={[
                           "rounded-full px-3 py-1.5 text-[12px] font-medium transition",
-                          active ? "bg-[#f1eeff] text-[#5f51d5]" : "bg-[#f7f1e8] text-slate-600",
+                          active
+                            ? "bg-[#f1eeff] text-[#5f51d5]"
+                            : "bg-[#f7f1e8] text-slate-600",
                         ].join(" ")}
                         type="button"
                         onClick={() => toggleRegion(region)}
@@ -596,13 +975,16 @@ function ThemePhone() {
 
               <div className="mt-6 rounded-[22px] bg-white px-4 py-4 shadow-[0_8px_20px_rgba(99,75,43,0.04)]">
                 <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-semibold text-slate-900">선택 미리보기</p>
+                  <p className="text-[13px] font-semibold text-slate-900">
+                    선택 미리보기
+                  </p>
                   <span className="text-[11px] text-slate-500">
                     {previewRegions.length}개 지역
                   </span>
                 </div>
                 <p className="mt-2 text-[12px] leading-5 text-slate-500">
-                  {selectedSubtheme} · {previewRegions.join(", ")} 기준으로 피드를 준비했어요.
+                  {selectedSubtheme} · {previewRegions.join(", ")} 기준으로
+                  피드를 준비했어요.
                 </p>
               </div>
             </div>
@@ -656,7 +1038,9 @@ function ThemePhone() {
                   <p className="text-[13px] font-semibold text-slate-900">
                     {selectedSubtheme} 추천 피드
                   </p>
-                  <span className="text-[11px] text-slate-500">{feedCards.length}개 콘텐츠</span>
+                  <span className="text-[11px] text-slate-500">
+                    {feedCards.length}개 콘텐츠
+                  </span>
                 </div>
                 <p className="mt-2 text-[12px] leading-5 text-slate-500">
                   저장이 많은 순서와 지역 조합을 반영한 목 데이터 피드입니다.
@@ -683,7 +1067,9 @@ function ThemePhone() {
                       <h3 className="text-[14px] font-semibold text-slate-900">
                         {card.title}
                       </h3>
-                      <p className="mt-1 text-[11px] text-slate-500">{card.subtitle}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {card.subtitle}
+                      </p>
                       <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
                         <span>{card.location}</span>
                         <span>저장 {card.likeCount}</span>
@@ -712,7 +1098,7 @@ function ThemePhone() {
         ) : null}
 
         <nav className="mt-3 border-t border-[#f1ebe2] pt-2">
-          <ul className="grid grid-cols-5 gap-1">
+          <ul className="grid grid-cols-4 gap-1">
             {tabItems.map((tab) => (
               <li key={tab.label}>
                 <RouteLink
@@ -729,7 +1115,7 @@ function ThemePhone() {
                   </span>
                   <span
                     className={[
-                      "text-[11px] font-semibold leading-none",
+                      "text-[11px] leading-none font-semibold",
                       tab.active ? "text-[#5f51d5]" : "text-slate-500",
                     ].join(" ")}
                   >
@@ -746,7 +1132,7 @@ function ThemePhone() {
             <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,#ffe6c5_0%,rgba(255,230,197,0)_72%)]" />
             <div className="flex h-full flex-col overflow-hidden">
               <div className="relative mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#d4822f]">
+                <p className="text-[11px] font-semibold tracking-[0.22em] text-[#d4822f] uppercase">
                   Explore Search
                 </p>
                 <p className="mt-1 text-[13px] text-slate-500">
@@ -789,7 +1175,9 @@ function ThemePhone() {
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#5f51d5] transition hover:bg-[#f6f1ff]"
                   type="button"
                   onClick={() =>
-                    setSearchStage((current) => (current === "filters" ? "results" : "filters"))
+                    setSearchStage((current) =>
+                      current === "filters" ? "results" : "filters",
+                    )
                   }
                 >
                   <SlidersIcon className="h-[19px] w-[19px]" />
@@ -799,7 +1187,9 @@ function ThemePhone() {
               {searchStage === "home" ? (
                 <div className="no-scrollbar mt-6 flex-1 overflow-y-auto">
                   <section className="rounded-[22px] bg-white/74 px-4 py-4 shadow-[0_10px_24px_rgba(99,75,43,0.06)]">
-                    <h2 className="text-sm font-semibold text-slate-700">최근 검색</h2>
+                    <h2 className="text-sm font-semibold text-slate-700">
+                      최근 검색
+                    </h2>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {recentSearches.map((item) => (
                         <button
@@ -815,10 +1205,15 @@ function ThemePhone() {
                   </section>
 
                   <section className="mt-4 rounded-[22px] bg-white/74 px-4 py-4 shadow-[0_10px_24px_rgba(99,75,43,0.06)]">
-                    <h2 className="text-sm font-semibold text-slate-700">인기 검색어</h2>
+                    <h2 className="text-sm font-semibold text-slate-700">
+                      인기 검색어
+                    </h2>
                     <ol className="mt-3 space-y-3">
                       {trendingKeywords.map((item, index) => (
-                        <li key={item} className="flex items-center gap-3 text-[15px]">
+                        <li
+                          key={item}
+                          className="flex items-center gap-3 text-[15px]"
+                        >
                           <span className="w-4 text-center font-semibold text-[#5f51d5]">
                             {index + 1}
                           </span>
@@ -842,13 +1237,21 @@ function ThemePhone() {
               {searchStage === "filters" ? (
                 <div className="no-scrollbar mt-5 flex-1 overflow-y-auto pr-1">
                   <section className="rounded-[22px] bg-white/74 px-4 py-4 shadow-[0_10px_24px_rgba(99,75,43,0.06)]">
-                    <h2 className="text-sm font-semibold text-slate-700">지역</h2>
+                    <h2 className="text-sm font-semibold text-slate-700">
+                      지역
+                    </h2>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {searchRegionOptions.map((option) => (
                         <FilterChip
                           key={option}
                           active={searchRegions.includes(option)}
-                          onClick={() => toggleSearchItem(searchRegions, option, setSearchRegions)}
+                          onClick={() =>
+                            toggleSearchItem(
+                              searchRegions,
+                              option,
+                              setSearchRegions,
+                            )
+                          }
                         >
                           {option}
                         </FilterChip>
@@ -857,13 +1260,21 @@ function ThemePhone() {
                   </section>
 
                   <section className="mt-4 rounded-[22px] bg-white/74 px-4 py-4 shadow-[0_10px_24px_rgba(99,75,43,0.06)]">
-                    <h2 className="text-sm font-semibold text-slate-700">테마</h2>
+                    <h2 className="text-sm font-semibold text-slate-700">
+                      테마
+                    </h2>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {searchThemeOptions.map((option) => (
                         <FilterChip
                           key={option}
                           active={searchThemes.includes(option)}
-                          onClick={() => toggleSearchItem(searchThemes, option, setSearchThemes)}
+                          onClick={() =>
+                            toggleSearchItem(
+                              searchThemes,
+                              option,
+                              setSearchThemes,
+                            )
+                          }
                         >
                           {option}
                         </FilterChip>
@@ -872,13 +1283,21 @@ function ThemePhone() {
                   </section>
 
                   <section className="mt-4 rounded-[22px] bg-white/74 px-4 py-4 shadow-[0_10px_24px_rgba(99,75,43,0.06)]">
-                    <h2 className="text-sm font-semibold text-slate-700">여행 유형</h2>
+                    <h2 className="text-sm font-semibold text-slate-700">
+                      여행 유형
+                    </h2>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {searchTypeOptions.map((option) => (
                         <FilterChip
                           key={option}
                           active={searchTypes.includes(option)}
-                          onClick={() => toggleSearchItem(searchTypes, option, setSearchTypes)}
+                          onClick={() =>
+                            toggleSearchItem(
+                              searchTypes,
+                              option,
+                              setSearchTypes,
+                            )
+                          }
                         >
                           {option}
                         </FilterChip>
@@ -913,15 +1332,15 @@ function ThemePhone() {
                 <div className="no-scrollbar mt-5 flex-1 overflow-y-auto pr-1">
                   <div className="rounded-[22px] bg-white/74 px-4 py-4 shadow-[0_10px_24px_rgba(99,75,43,0.06)]">
                     <div className="flex flex-wrap gap-2">
-                    {appliedSearchFilters.map((filter) => (
-                      <button
-                        key={filter}
-                        className="rounded-full bg-[#f1eeff] px-3 py-1.5 text-[11px] font-medium text-[#5f51d5]"
-                        type="button"
-                      >
-                        {filter} ×
-                      </button>
-                    ))}
+                      {appliedSearchFilters.map((filter) => (
+                        <button
+                          key={filter}
+                          className="rounded-full bg-[#f1eeff] px-3 py-1.5 text-[11px] font-medium text-[#5f51d5]"
+                          type="button"
+                        >
+                          {filter} ×
+                        </button>
+                      ))}
                     </div>
 
                     <div className="mt-4 flex items-center justify-between">
@@ -963,7 +1382,9 @@ function ThemePhone() {
                           <h3 className="truncate text-[14px] font-semibold text-slate-900">
                             {card.title}
                           </h3>
-                          <p className="mt-1 text-[12px] text-slate-500">⌖ {card.location}</p>
+                          <p className="mt-1 text-[12px] text-slate-500">
+                            ⌖ {card.location}
+                          </p>
                         </div>
                         <span className="shrink-0 rounded-full bg-[#f7f1e8] px-2.5 py-1 text-[10px] font-semibold text-slate-600">
                           {card.subtitle}
@@ -982,6 +1403,8 @@ function ThemePhone() {
 }
 
 export function ThemePage() {
+  const authUser = useAuthUser();
+
   return (
     <ShowcaseLayout phone={<ThemePhone />}>
       <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm text-slate-700 backdrop-blur">
@@ -998,9 +1421,57 @@ export function ThemePage() {
       </h1>
 
       <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 md:text-lg">
-        맛집, 명소, 루트 중 큰 테마를 먼저 고르고, 서브테마와 지역을 더해
-        원하는 분위기의 콘텐츠만 빠르게 좁혀보는 탐색 흐름입니다.
+        맛집, 명소, 루트 중 큰 테마를 먼저 고르고, 서브테마와 지역을 더해 원하는
+        분위기의 콘텐츠만 빠르게 좁혀보는 탐색 흐름입니다.
       </p>
+
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        {authUser ? (
+          <>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#d4deee] bg-white/80 px-5 py-3 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">
+                {authUser.nickname}
+              </span>
+              <span className="text-slate-400">·</span>
+              저장한 루트와 최근 검색을 이어서 볼 수 있어요
+            </div>
+            <button
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-white"
+              type="button"
+              onClick={async () => {
+                const refreshToken = getRefreshToken();
+
+                try {
+                  if (refreshToken) {
+                    await logout(refreshToken);
+                  }
+                } catch (error) {
+                  console.error("Failed to logout", error);
+                } finally {
+                  clearAuthSession();
+                }
+              }}
+            >
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full bg-[#5f51d5] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(95,81,213,0.3)] transition hover:bg-[#5243c8]"
+              href={buildPath.login()}
+            >
+              <p className="text-white">로그인</p>
+            </RouteLink>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+              href={buildPath.signup()}
+            >
+              회원가입
+            </RouteLink>
+          </>
+        )}
+      </div>
     </ShowcaseLayout>
   );
 }

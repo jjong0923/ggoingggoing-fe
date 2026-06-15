@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  clearAuthSession,
+  getRefreshToken,
+  useAuthUser,
+} from "../../shared/lib/authSession";
 import { buildPath } from "../../app/router/routePaths";
-import { UserCircleIcon } from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
 import { ShowcaseLayout } from "../../shared/ui/ShowcaseLayout";
@@ -123,7 +127,9 @@ const rouletteResults: RouletteResult[] = [
 
 const rouletteSlices = rouletteResults.map((result, index) => ({
   label: result.subtitle.split(" ")[0],
-  color: ["#9ee0d3", "#d9d3ff", "#c8efe9", "#ffe2d5", "#ffd28a", "#9b92f7"][index],
+  color: ["#9ee0d3", "#d9d3ff", "#c8efe9", "#ffe2d5", "#ffd28a", "#9b92f7"][
+    index
+  ],
   resultId: result.id,
 }));
 
@@ -132,12 +138,6 @@ const tabItems = [
   { icon: "⌕", label: "탐색", href: buildPath.theme(), active: false },
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: true },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
-  {
-    icon: <UserCircleIcon className="h-[18px] w-[18px]" />,
-    label: "MY",
-    href: buildPath.my(),
-    active: false,
-  },
 ];
 
 function RouletteChip({
@@ -178,10 +178,10 @@ function RouletteWheel({
         className="absolute inset-0 z-20 transition-transform duration-[3200ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         style={{ transform: `rotate(${pointerRotation}deg)` }}
       >
-        <div className="absolute left-1/2 top-3 h-8 w-1 -translate-x-1/2 rounded-full bg-[#5f51d5]/30" />
+        <div className="absolute top-3 left-1/2 h-8 w-1 -translate-x-1/2 rounded-full bg-[#5f51d5]/30" />
         <div
           className={[
-            "absolute left-1/2 top-3 h-0 w-0 -translate-x-1/2 border-l-[9px] border-r-[9px] border-b-[18px] border-l-transparent border-r-transparent border-b-[#5f51d5]",
+            "absolute top-3 left-1/2 h-0 w-0 -translate-x-1/2 border-r-[9px] border-b-[18px] border-l-[9px] border-r-transparent border-b-[#5f51d5] border-l-transparent",
             isSpinning ? "opacity-100" : "opacity-100",
           ].join(" ")}
         />
@@ -204,7 +204,7 @@ function RouletteWheel({
         return (
           <span
             key={slice.label}
-            className="absolute left-1/2 top-1/2 text-[10px] font-semibold text-slate-600"
+            className="absolute top-1/2 left-1/2 text-[10px] font-semibold text-slate-600"
             style={{
               transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-78px) rotate(${-angle}deg)`,
             }}
@@ -229,7 +229,8 @@ function RoulettePhone() {
 
   const availableResults = useMemo(() => {
     return rouletteResults.filter((result) => {
-      const regionMatch = selectedRegion === "all" || result.region === selectedRegion;
+      const regionMatch =
+        selectedRegion === "all" || result.region === selectedRegion;
       const themeMatch = result.themes.includes(selectedTheme);
       const tripTypeMatch = result.tripTypes.includes(selectedTripType);
 
@@ -264,7 +265,8 @@ function RoulettePhone() {
       window.cancelAnimationFrame(animationFrameRef.current);
     }
 
-    const candidatePool = availableResults.length > 0 ? availableResults : rouletteResults;
+    const candidatePool =
+      availableResults.length > 0 ? availableResults : rouletteResults;
     const nextResult =
       candidatePool[Math.floor(Math.random() * candidatePool.length)];
     const nextSliceIndex = rouletteSlices.findIndex(
@@ -350,7 +352,9 @@ function RoulettePhone() {
             </section>
 
             <section className="mt-6">
-              <p className="text-[12px] font-semibold text-slate-500">여행 유형</p>
+              <p className="text-[12px] font-semibold text-slate-500">
+                여행 유형
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {tripTypeOptions.map((option) => (
                   <RouletteChip
@@ -438,7 +442,7 @@ function RoulettePhone() {
         ) : null}
 
         <nav className="mt-3 border-t border-[#f1ebe2] pt-2">
-          <ul className="grid grid-cols-5 gap-1">
+          <ul className="grid grid-cols-4 gap-1">
             {tabItems.map((tab) => (
               <li key={tab.label}>
                 <RouteLink
@@ -455,7 +459,7 @@ function RoulettePhone() {
                   </span>
                   <span
                     className={[
-                      "text-[11px] font-semibold leading-none",
+                      "text-[11px] leading-none font-semibold",
                       tab.active ? "text-[#5f51d5]" : "text-slate-500",
                     ].join(" ")}
                   >
@@ -472,6 +476,8 @@ function RoulettePhone() {
 }
 
 export function RoulettePage() {
+  const authUser = useAuthUser();
+
   return (
     <ShowcaseLayout phone={<RoulettePhone />}>
       <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm text-slate-700 backdrop-blur">
@@ -488,9 +494,58 @@ export function RoulettePage() {
       </h1>
 
       <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-        지역, 테마, 여행 유형만 가볍게 고르면 조건에 맞는 후보를 룰렛으로 추천하고,
-        결과 카드에서 바로 루트 만들기나 소장으로 이어질 수 있는 흐름입니다.
+        지역, 테마, 여행 유형만 가볍게 고르면 조건에 맞는 후보를 룰렛으로
+        추천하고, 결과 카드에서 바로 루트 만들기나 소장으로 이어질 수 있는
+        흐름입니다.
       </p>
+
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        {authUser ? (
+          <>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#d4deee] bg-white/80 px-5 py-3 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">
+                {authUser.nickname}
+              </span>
+              <span className="text-slate-400">·</span>
+              저장한 루트와 최근 검색을 이어서 볼 수 있어요
+            </div>
+            <button
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-white"
+              type="button"
+              onClick={async () => {
+                const refreshToken = getRefreshToken();
+
+                try {
+                  if (refreshToken) {
+                    await logout(refreshToken);
+                  }
+                } catch (error) {
+                  console.error("Failed to logout", error);
+                } finally {
+                  clearAuthSession();
+                }
+              }}
+            >
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full bg-[#5f51d5] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(95,81,213,0.3)] transition hover:bg-[#5243c8]"
+              href={buildPath.login()}
+            >
+              <p className="text-white">로그인</p>
+            </RouteLink>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+              href={buildPath.signup()}
+            >
+              회원가입
+            </RouteLink>
+          </>
+        )}
+      </div>
     </ShowcaseLayout>
   );
 }

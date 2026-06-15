@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
 import { getContents } from "../../shared/apis/contents";
 import {
+  clearAuthSession,
+  getRefreshToken,
+  useAuthUser,
+} from "../../shared/lib/authSession";
+import {
   getPopularSearches,
   getRecentSearches,
   searchContents,
@@ -30,7 +35,15 @@ type ResultCard = {
   viewCount: number;
 };
 
-const regionOptions = ["전국", "수도권", "부산/경남", "강원", "제주", "전라", "충청"];
+const regionOptions = [
+  "전국",
+  "수도권",
+  "부산/경남",
+  "강원",
+  "제주",
+  "전라",
+  "충청",
+];
 const themeOptions = ["맛집", "명소", "루트", "힐링", "등산", "계곡", "축제"];
 const typeOptions = ["당일치기", "1박 2일", "혼자", "커플", "가족"];
 const sortOptions = ["추천순", "인기순", "최신순"] as const;
@@ -58,7 +71,7 @@ function FilterChip({ active, children, onClick }: FilterChipProps) {
   return (
     <button
       className={[
-        "rounded-full px-3.5 py-2 text-[13px] font-medium transition whitespace-nowrap",
+        "rounded-full px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition",
         active
           ? "bg-[#f1eeff] text-[#5f51d5] shadow-[0_8px_18px_rgba(95,81,213,0.12)]"
           : "bg-[#f7f1e8] text-slate-600 hover:bg-[#faf7f2]",
@@ -71,7 +84,9 @@ function FilterChip({ active, children, onClick }: FilterChipProps) {
   );
 }
 
-function toCategory(contentType: ContentSummary["contentType"]): ResultCard["category"] {
+function toCategory(
+  contentType: ContentSummary["contentType"],
+): ResultCard["category"] {
   return getCategoryLabelFromContentType(contentType);
 }
 
@@ -97,17 +112,26 @@ function sortResults(
   }
 
   if (sort === "최신순") {
-    return copiedCards.sort((left, right) => Number(right.id) - Number(left.id));
+    return copiedCards.sort(
+      (left, right) => Number(right.id) - Number(left.id),
+    );
   }
 
-  return copiedCards.sort((left, right) => Number(right.hot) - Number(left.hot));
+  return copiedCards.sort(
+    (left, right) => Number(right.hot) - Number(left.hot),
+  );
 }
 
 function SearchPhone() {
   const [stage, setStage] = useState<SearchStage>("home");
   const [keyword, setKeyword] = useState("부산");
-  const [selectedRegions, setSelectedRegions] = useState<string[]>(["부산/경남"]);
-  const [selectedThemes, setSelectedThemes] = useState<string[]>(["맛집", "명소"]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([
+    "부산/경남",
+  ]);
+  const [selectedThemes, setSelectedThemes] = useState<string[]>([
+    "맛집",
+    "명소",
+  ]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(["당일치기"]);
   const [selectedSort, setSelectedSort] =
     useState<(typeof sortOptions)[number]>("추천순");
@@ -117,7 +141,11 @@ function SearchPhone() {
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const appliedFilters = [...selectedRegions, ...selectedThemes, ...selectedTypes];
+  const appliedFilters = [
+    ...selectedRegions,
+    ...selectedThemes,
+    ...selectedTypes,
+  ];
 
   const sortedResults = useMemo(
     () => sortResults(resultCards, selectedSort),
@@ -129,7 +157,11 @@ function SearchPhone() {
     value: string,
     setList: (next: string[]) => void,
   ) => {
-    setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
+    setList(
+      list.includes(value)
+        ? list.filter((item) => item !== value)
+        : [...list, value],
+    );
   };
 
   useEffect(() => {
@@ -203,7 +235,9 @@ function SearchPhone() {
             selectedRegions.length === 0 ||
             selectedRegions.includes("전국") ||
             selectedRegions.some((region) =>
-              `${content.regionName} ${content.themeName}`.includes(region.replace("/경남", "")),
+              `${content.regionName} ${content.themeName}`.includes(
+                region.replace("/경남", ""),
+              ),
             );
           const matchesTheme =
             selectedThemes.length === 0 ||
@@ -241,7 +275,9 @@ function SearchPhone() {
             aria-label="뒤로가기"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-slate-700 transition hover:bg-[#f8f4ee]"
             type="button"
-            onClick={() => (stage === "home" ? navigateTo(buildPath.home()) : setStage("home"))}
+            onClick={() =>
+              stage === "home" ? navigateTo(buildPath.home()) : setStage("home")
+            }
           >
             ←
           </button>
@@ -270,7 +306,9 @@ function SearchPhone() {
             aria-label="필터 열기"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[20px] text-[#5f51d5] transition hover:bg-[#f6f1ff]"
             type="button"
-            onClick={() => setStage(stage === "filters" ? "results" : "filters")}
+            onClick={() =>
+              setStage(stage === "filters" ? "results" : "filters")
+            }
           >
             <SlidersIcon className="h-[19px] w-[19px]" />
           </button>
@@ -279,7 +317,9 @@ function SearchPhone() {
         {stage === "home" ? (
           <div className="no-scrollbar mt-6 flex-1 overflow-y-auto">
             <section>
-              <h2 className="text-sm font-semibold text-slate-700">최근 검색</h2>
+              <h2 className="text-sm font-semibold text-slate-700">
+                최근 검색
+              </h2>
               {recentSearches.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {recentSearches.map((item) => (
@@ -304,10 +344,15 @@ function SearchPhone() {
             </section>
 
             <section className="mt-7 pt-5">
-              <h2 className="text-sm font-semibold text-slate-700">인기 검색어</h2>
+              <h2 className="text-sm font-semibold text-slate-700">
+                인기 검색어
+              </h2>
               <ol className="mt-3 space-y-3">
                 {trendingKeywords.map((item, index) => (
-                  <li key={item} className="flex items-center gap-3 text-[15px]">
+                  <li
+                    key={item}
+                    className="flex items-center gap-3 text-[15px]"
+                  >
                     <span className="w-4 text-center font-semibold text-[#5f51d5]">
                       {index + 1}
                     </span>
@@ -337,7 +382,9 @@ function SearchPhone() {
                   <FilterChip
                     key={option}
                     active={selectedRegions.includes(option)}
-                    onClick={() => toggleItem(selectedRegions, option, setSelectedRegions)}
+                    onClick={() =>
+                      toggleItem(selectedRegions, option, setSelectedRegions)
+                    }
                   >
                     {option}
                   </FilterChip>
@@ -352,7 +399,9 @@ function SearchPhone() {
                   <FilterChip
                     key={option}
                     active={selectedThemes.includes(option)}
-                    onClick={() => toggleItem(selectedThemes, option, setSelectedThemes)}
+                    onClick={() =>
+                      toggleItem(selectedThemes, option, setSelectedThemes)
+                    }
                   >
                     {option}
                   </FilterChip>
@@ -361,13 +410,17 @@ function SearchPhone() {
             </section>
 
             <section className="mt-6">
-              <h2 className="text-sm font-semibold text-slate-700">여행 유형</h2>
+              <h2 className="text-sm font-semibold text-slate-700">
+                여행 유형
+              </h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {typeOptions.map((option) => (
                   <FilterChip
                     key={option}
                     active={selectedTypes.includes(option)}
-                    onClick={() => toggleItem(selectedTypes, option, setSelectedTypes)}
+                    onClick={() =>
+                      toggleItem(selectedTypes, option, setSelectedTypes)
+                    }
                   >
                     {option}
                   </FilterChip>
@@ -414,7 +467,9 @@ function SearchPhone() {
 
             <div className="mt-4 flex items-center justify-between">
               <p className="text-[13px] font-medium text-slate-600">
-                {isLoadingResults ? "검색 중..." : `결과 ${sortedResults.length}개`}
+                {isLoadingResults
+                  ? "검색 중..."
+                  : `결과 ${sortedResults.length}개`}
               </p>
             </div>
 
@@ -462,7 +517,9 @@ function SearchPhone() {
                     <h3 className="truncate text-[14px] font-semibold text-slate-900">
                       {card.title}
                     </h3>
-                    <p className="mt-1 text-[12px] text-slate-500">⌖ {card.subtitle}</p>
+                    <p className="mt-1 text-[12px] text-slate-500">
+                      ⌖ {card.subtitle}
+                    </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span
@@ -474,7 +531,9 @@ function SearchPhone() {
                       {card.category}
                     </span>
                     {card.hot ? (
-                      <span className="text-[10px] font-semibold text-[#ec7e52]">HOT</span>
+                      <span className="text-[10px] font-semibold text-[#ec7e52]">
+                        HOT
+                      </span>
                     ) : null}
                   </div>
                 </RouteLink>
@@ -501,7 +560,7 @@ function SearchPhone() {
                   </span>
                   <span
                     className={[
-                      "text-[11px] font-semibold leading-none",
+                      "text-[11px] leading-none font-semibold",
                       tab.active ? "text-[#5f51d5]" : "text-slate-500",
                     ].join(" ")}
                   >
@@ -518,6 +577,8 @@ function SearchPhone() {
 }
 
 export function SearchPage() {
+  const authUser = useAuthUser();
+
   return (
     <ShowcaseLayout phone={<SearchPhone />}>
       <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm text-slate-700 backdrop-blur">
@@ -534,9 +595,57 @@ export function SearchPage() {
       </h1>
 
       <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 md:text-lg">
-        인기 검색어와 키워드 검색, 인증이 필요한 최근 검색어까지 실제 API 응답으로
-        바꾸고 결과 리스트를 그 흐름에 맞춰 연결했습니다.
+        인기 검색어와 키워드 검색, 인증이 필요한 최근 검색어까지 실제 API
+        응답으로 바꾸고 결과 리스트를 그 흐름에 맞춰 연결했습니다.
       </p>
+
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        {authUser ? (
+          <>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#d4deee] bg-white/80 px-5 py-3 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">
+                {authUser.nickname}
+              </span>
+              <span className="text-slate-400">·</span>
+              저장한 루트와 최근 검색을 이어서 볼 수 있어요
+            </div>
+            <button
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-white"
+              type="button"
+              onClick={async () => {
+                const refreshToken = getRefreshToken();
+
+                try {
+                  if (refreshToken) {
+                    await logout(refreshToken);
+                  }
+                } catch (error) {
+                  console.error("Failed to logout", error);
+                } finally {
+                  clearAuthSession();
+                }
+              }}
+            >
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full bg-[#5f51d5] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(95,81,213,0.3)] transition hover:bg-[#5243c8]"
+              href={buildPath.login()}
+            >
+              <p className="text-white">로그인</p>
+            </RouteLink>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+              href={buildPath.signup()}
+            >
+              회원가입
+            </RouteLink>
+          </>
+        )}
+      </div>
     </ShowcaseLayout>
   );
 }

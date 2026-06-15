@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
-import {
-  SearchIcon,
-  UserCircleIcon,
-} from "../../shared/ui/AppIcons";
+import { SearchIcon } from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
 import { ShowcaseLayout } from "../../shared/ui/ShowcaseLayout";
@@ -133,12 +130,6 @@ const tabItems = [
   { icon: "⌕", label: "탐색", href: buildPath.theme(), active: false },
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: false },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: true },
-  {
-    icon: <UserCircleIcon className="h-[18px] w-[18px]" />,
-    label: "MY",
-    href: buildPath.my(),
-    active: false,
-  },
 ];
 
 const sortChips = ["최근 저장순", "지역순", "테마순"];
@@ -149,7 +140,8 @@ function CollectionPhone() {
   const [selectedSort, setSelectedSort] = useState(sortChips[0]);
 
   const selectedFolder = useMemo(
-    () => folders.find((folder) => folder.id === selectedFolderId) ?? folders[0],
+    () =>
+      folders.find((folder) => folder.id === selectedFolderId) ?? folders[0],
     [selectedFolderId],
   );
 
@@ -209,7 +201,9 @@ function CollectionPhone() {
 
         {tab === "folder" && selectedFolderId === null ? (
           <div className="no-scrollbar mt-4 flex-1 overflow-y-auto pr-1">
-            <p className="text-[13px] font-medium text-slate-500">총 18개 소장</p>
+            <p className="text-[13px] font-medium text-slate-500">
+              총 18개 소장
+            </p>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               {folders.map((folder) => (
@@ -236,8 +230,12 @@ function CollectionPhone() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-3 text-[14px] font-semibold text-slate-900">{folder.title}</p>
-                  <p className="mt-1 text-[12px] text-slate-500">{folder.count}개</p>
+                  <p className="mt-3 text-[14px] font-semibold text-slate-900">
+                    {folder.title}
+                  </p>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    {folder.count}개
+                  </p>
                 </button>
               ))}
 
@@ -262,7 +260,9 @@ function CollectionPhone() {
               >
                 ←
               </button>
-              <h3 className="text-[18px] font-semibold text-slate-900">{selectedFolder.title}</h3>
+              <h3 className="text-[18px] font-semibold text-slate-900">
+                {selectedFolder.title}
+              </h3>
               <button
                 className="flex h-9 w-9 items-center justify-center rounded-full text-[18px] text-slate-700 transition hover:bg-[#f8f4ee]"
                 type="button"
@@ -300,16 +300,20 @@ function CollectionPhone() {
                     className="relative flex h-24 items-start justify-between px-3 py-3"
                     style={{ backgroundColor: card.accent }}
                   >
-                    <span className="text-[12px] font-semibold text-white/80">{card.emoji}</span>
+                    <span className="text-[12px] font-semibold text-white/80">
+                      {card.emoji}
+                    </span>
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[14px] text-[#ff7da6]">
                       ♡
                     </span>
                   </div>
                   <div className="px-3 py-3">
-                    <h4 className="text-[14px] font-semibold leading-5 text-slate-900">
+                    <h4 className="text-[14px] leading-5 font-semibold text-slate-900">
                       {card.title}
                     </h4>
-                    <p className="mt-1 text-[12px] text-slate-500">{card.location}</p>
+                    <p className="mt-1 text-[12px] text-slate-500">
+                      {card.location}
+                    </p>
                     <span className="mt-3 inline-flex rounded-full bg-[#f1eeff] px-2.5 py-1 text-[10px] font-semibold text-[#6d58d8]">
                       {card.category}
                     </span>
@@ -338,14 +342,14 @@ function CollectionPhone() {
                 className="mt-5 inline-flex items-center justify-center rounded-2xl bg-[#5f51d5] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(95,81,213,0.24)]"
                 href={buildPath.routeResult("saved-route-002")}
               >
-                <p className="text-white">
-                  루트 만들러 가기
-                </p>
+                <p className="text-white">루트 만들러 가기</p>
               </RouteLink>
             </div>
 
             <div className="mt-5 border-t border-[#efe7dc] pt-4">
-              <p className="text-[13px] font-semibold text-slate-500">이런 루트 어때요?</p>
+              <p className="text-[13px] font-semibold text-slate-500">
+                이런 루트 어때요?
+              </p>
               <RouteLink
                 className="mt-3 flex items-center gap-3 rounded-[18px] bg-[#f7f1e8] px-4 py-4"
                 href={buildPath.routeResult("saved-route-002")}
@@ -368,7 +372,7 @@ function CollectionPhone() {
         ) : null}
 
         <nav className="mt-3 border-t border-[#f1ebe2] pt-2">
-          <ul className="grid grid-cols-5 gap-1">
+          <ul className="grid grid-cols-4 gap-1">
             {tabItems.map((tabItem) => (
               <li key={tabItem.label}>
                 <RouteLink
@@ -385,7 +389,7 @@ function CollectionPhone() {
                   </span>
                   <span
                     className={[
-                      "text-[11px] font-semibold leading-none",
+                      "text-[11px] leading-none font-semibold",
                       tabItem.active ? "text-[#5f51d5]" : "text-slate-500",
                     ].join(" ")}
                   >
