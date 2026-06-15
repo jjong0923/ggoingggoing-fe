@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
+import { useAuthUser } from "../../shared/lib/authSession";
 import { navigateTo } from "../../shared/lib/router";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
@@ -87,6 +88,7 @@ function SelectionRow({ active, label, onClick }: SelectionRowProps) {
 }
 
 function OnboardingPhone({
+  authNickname,
   budget,
   canFinishOnboarding,
   companion,
@@ -103,6 +105,7 @@ function OnboardingPhone({
   travelTime,
   toggleMultiSelect,
 }: {
+  authNickname: string | null;
   budget: string;
   canFinishOnboarding: boolean;
   companion: string;
@@ -147,14 +150,28 @@ function OnboardingPhone({
               type="button"
               onClick={() => setStep("themes")}
             >
-              시작하기
+              {authNickname ? `${authNickname}님 취향 설정 이어가기` : "시작하기"}
             </button>
+            <div className="grid grid-cols-2 gap-2">
+              <RouteLink
+                className="inline-flex items-center justify-center rounded-2xl border border-[#ddd3c8] bg-white/75 px-4 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+                href={buildPath.login()}
+              >
+                로그인
+              </RouteLink>
+              <RouteLink
+                className="inline-flex items-center justify-center rounded-2xl border border-[#ddd3c8] bg-white/75 px-4 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+                href={buildPath.signup()}
+              >
+                회원가입
+              </RouteLink>
+            </div>
             <button
               className="w-full rounded-2xl px-4 py-3.5 text-sm font-medium text-slate-500 transition hover:bg-[#faf7f2]"
               type="button"
               onClick={() => navigateTo(buildPath.home())}
             >
-              둘러보기
+              게스트로 둘러보기
             </button>
           </div>
         </div>
@@ -345,6 +362,7 @@ function OnboardingPhone({
 }
 
 export function OnboardingPage() {
+  const authUser = useAuthUser();
   const [step, setStep] = useState<OnboardingStep>("splash");
   const [themes, setThemes] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
@@ -372,6 +390,7 @@ export function OnboardingPage() {
     <ShowcaseLayout
       phone={
         <OnboardingPhone
+          authNickname={authUser?.nickname ?? null}
           budget={budget}
           canFinishOnboarding={canFinishOnboarding}
           companion={companion}
@@ -419,31 +438,22 @@ export function OnboardingPage() {
         </button>
         <RouteLink
           className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+          href={buildPath.login()}
+        >
+          로그인
+        </RouteLink>
+        <RouteLink
+          className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+          href={buildPath.signup()}
+        >
+          회원가입
+        </RouteLink>
+        <RouteLink
+          className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
           href={buildPath.home()}
         >
           둘러보기
         </RouteLink>
-      </div>
-
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
-        <div className="rounded-[28px] border border-white/80 bg-white/72 p-5 backdrop-blur">
-          <p className="text-sm font-semibold text-slate-900">취향 기반 추천</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            테마와 여행 스타일을 바탕으로 첫 피드부터 더 가깝게 추천합니다.
-          </p>
-        </div>
-        <div className="rounded-[28px] border border-white/80 bg-white/72 p-5 backdrop-blur">
-          <p className="text-sm font-semibold text-slate-900">지역 맞춤 탐색</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            자주 가는 지역을 먼저 설정해 검색과 탐색의 기본값으로 활용합니다.
-          </p>
-        </div>
-        <div className="rounded-[28px] border border-white/80 bg-white/72 p-5 backdrop-blur">
-          <p className="text-sm font-semibold text-slate-900">게스트로 시작</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            회원가입 전에도 피드와 검색을 먼저 둘러보며 분위기를 확인할 수 있어요.
-          </p>
-        </div>
       </div>
     </ShowcaseLayout>
   );

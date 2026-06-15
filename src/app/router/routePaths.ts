@@ -1,6 +1,8 @@
 export const routePaths = {
   onboarding: "/",
   home: "/home",
+  login: "/login",
+  signup: "/signup",
   search: "/search",
   contentDetail: "/contents/:contentId",
   routeResult: "/routes/:routeId",
@@ -13,11 +15,12 @@ export const routePaths = {
 export const buildPath = {
   onboarding: () => routePaths.onboarding,
   home: () => routePaths.home,
+  login: () => routePaths.login,
+  signup: () => routePaths.signup,
   search: () => routePaths.search,
   contentDetail: (contentId: string) => `/contents/${contentId}`,
   routeResult: (routeId: string) => `/routes/${routeId}`,
   collection: () => routePaths.collection,
-  my: () => routePaths.my,
   theme: () => routePaths.theme,
   roulette: () => routePaths.roulette,
 };

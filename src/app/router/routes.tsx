@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
+import { AuthPage } from "../../pages/auth/AuthPage";
 import { CollectionPage } from "../../pages/collection/CollectionPage";
 import { ContentDetailPage } from "../../pages/content-detail/ContentDetailPage";
 import { HomePage } from "../../pages/home/HomePage";
-import { MyPage } from "../../pages/my/MyPage";
 import { OnboardingPage } from "../../pages/onboarding/OnboardingPage";
 import { RoulettePage } from "../../pages/roulette/RoulettePage";
 import { RouteResultPage } from "../../pages/route-result/RouteResultPage";
@@ -40,6 +40,24 @@ export const appRoutes: AppRoute[] = [
     layout: "immersive",
     showTabBar: true,
     render: () => <HomePage />,
+  },
+  {
+    id: "login",
+    screenId: "F9",
+    path: routePaths.login,
+    title: "로그인",
+    description: "이메일/비밀번호 기반 간편 로그인",
+    layout: "immersive",
+    render: () => <AuthPage mode="login" />,
+  },
+  {
+    id: "signup",
+    screenId: "F10",
+    path: routePaths.signup,
+    title: "회원가입",
+    description: "닉네임, 이메일, 비밀번호 입력으로 시작하는 가입 화면",
+    layout: "immersive",
+    render: () => <AuthPage mode="signup" />,
   },
   {
     id: "search",
@@ -94,14 +112,5 @@ export const appRoutes: AppRoute[] = [
     layout: "immersive",
     showTabBar: true,
     render: () => <CollectionPage />,
-  },
-  {
-    id: "my",
-    screenId: "MY",
-    path: routePaths.my,
-    title: "마이페이지",
-    description: "프로필과 활동 요약",
-    showTabBar: true,
-    render: () => <MyPage />,
   },
 ];

@@ -1,10 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
+import { getContents, getHotContents } from "../../shared/apis/contents";
+import type { ContentSummary } from "../../shared/apis/types";
+import { logout } from "../../shared/apis/auth";
+import {
+  clearAuthSession,
+  getRefreshToken,
+  useAuthUser,
+} from "../../shared/lib/authSession";
+import {
+  getCategoryLabelFromContentType,
+  getContentTypeFromCategoryLabel,
+  getRegionIdFromLabel,
+} from "../../shared/lib/apiMappings";
 import {
   BellIcon,
   SearchIcon,
   SlidersIcon,
-  UserCircleIcon,
 } from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
@@ -20,71 +32,6 @@ type FeedCard = {
   title: string;
 };
 
-const filterChips = [
-  "전체",
-  "맛집",
-  "명소",
-  "루트",
-  "지역별",
-  "수도권",
-  "부산",
-  "강원",
-  "제주",
-];
-
-const feedCards: FeedCard[] = [
-  {
-    id: "content-001",
-    category: "맛집",
-    imageLabel: "성심당",
-    location: "대전",
-    region: "대전",
-    title: "성심당 튀김소보로",
-  },
-  {
-    id: "content-002",
-    category: "맛집",
-    imageLabel: "뭉티기",
-    location: "대구",
-    region: "대구",
-    title: "대구 뭉티기 맛집",
-  },
-  {
-    id: "content-003",
-    badge: "HOT",
-    category: "명소",
-    imageLabel: "영금정",
-    location: "강원 속초",
-    region: "강원 속초",
-    title: "속초 영금정 일출",
-  },
-  {
-    id: "content-004",
-    badge: "HOT",
-    category: "명소",
-    imageLabel: "한옥마을",
-    location: "전북 전주",
-    region: "전북 전주",
-    title: "전주 한옥마을",
-  },
-  {
-    id: "content-005",
-    category: "루트",
-    imageLabel: "광안리 루트",
-    location: "부산",
-    region: "부산",
-    title: "광안리 당일 루트",
-  },
-  {
-    id: "content-006",
-    category: "명소",
-    imageLabel: "산방산",
-    location: "제주",
-    region: "제주",
-    title: "제주 산방산 힐링",
-  },
-];
-
 const recentSearches = ["성심당", "속초 물회", "부산 당일치기"];
 const trendingKeywords = [
   "전주 한옥마을",
@@ -97,18 +44,14 @@ const searchRegionOptions = ["전국", "수도권", "부산/경남", "강원", "
 const searchThemeOptions = ["맛집", "명소", "루트", "힐링", "등산", "계곡", "축제"];
 const searchTypeOptions = ["당일치기", "1박 2일", "혼자", "커플", "가족"];
 const sortOptions = ["추천순", "인기순", "최신순"] as const;
+const categoryOptions = ["전체", "맛집", "명소"] as const;
+const regionOptions = ["전체", "수도권", "부산/경남", "강원", "제주", "전라", "충청"] as const;
 
 const tabItems = [
   { icon: "⌂", label: "홈", href: buildPath.home(), active: true },
   { icon: "⌕", label: "탐색", href: buildPath.theme(), active: false },
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: false },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
-  {
-    icon: <UserCircleIcon className="h-[18px] w-[18px]" />,
-    label: "MY",
-    href: buildPath.my(),
-    active: false,
-  },
 ];
 
 const categoryTone: Record<FeedCard["category"], string> = {
@@ -116,6 +59,18 @@ const categoryTone: Record<FeedCard["category"], string> = {
   명소: "bg-[#edf7e9] text-[#6ea243]",
   루트: "bg-[#eaf3ff] text-[#3880d7]",
 };
+
+function mapContentToFeedCard(content: ContentSummary): FeedCard {
+  return {
+    id: String(content.id),
+    badge: content.hot ? "HOT" : undefined,
+    category: getCategoryLabelFromContentType(content.contentType),
+    imageLabel: content.title,
+    location: content.themeName,
+    region: content.regionName,
+    title: content.title,
+  };
+}
 
 function FilterChip({
   active,
@@ -143,9 +98,10 @@ function FilterChip({
 }
 
 function HomePhone() {
+  const [feedCards, setFeedCards] = useState<FeedCard[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("전체");
   const [selectedRegion, setSelectedRegion] = useState<string>("전체");
-  const [showFilters, setShowFilters] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchStage, setSearchStage] = useState<"home" | "filters" | "results">("home");
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -155,18 +111,7 @@ function HomePhone() {
   const [selectedSort, setSelectedSort] =
     useState<(typeof sortOptions)[number]>("추천순");
 
-  const filteredCards = useMemo(() => {
-    return feedCards.filter((card) => {
-      const matchCategory =
-        selectedCategory === "전체" || card.category === selectedCategory;
-      const matchRegion =
-        selectedRegion === "전체" ||
-        card.region.includes(selectedRegion) ||
-        card.location.includes(selectedRegion);
-
-      return matchCategory && matchRegion;
-    });
-  }, [selectedCategory, selectedRegion]);
+  const filteredCards = useMemo(() => feedCards, [feedCards]);
 
   const highlightedCards = filteredCards.slice(0, 2).map((card) => card.id);
   const appliedSearchFilters = [...searchRegions, ...searchThemes, ...searchTypes];
@@ -201,6 +146,47 @@ function HomePhone() {
     setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
   };
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadContents = async () => {
+      try {
+        const shouldLoadHot =
+          selectedCategory === "전체" && selectedRegion === "전체";
+        const contents = shouldLoadHot
+          ? await getHotContents()
+          : await getContents({
+              contentType:
+                selectedCategory === "전체"
+                  ? undefined
+                  : getContentTypeFromCategoryLabel(selectedCategory),
+              regionId:
+                selectedRegion === "전체"
+                  ? undefined
+                  : getRegionIdFromLabel(selectedRegion),
+            });
+
+        if (!isMounted) {
+          return;
+        }
+
+        setFeedCards(contents.map(mapContentToFeedCard));
+      } catch (error) {
+        console.error("Failed to load hot contents", error);
+      } finally {
+        if (isMounted) {
+          setIsLoadingFeed(false);
+        }
+      }
+    };
+
+    void loadContents();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [feedCards, searchKeyword, searchRegions, searchThemes]);
+
   return (
     <PhoneFrame className="max-h-[850px] max-w-[430px]">
       <div
@@ -221,7 +207,6 @@ function HomePhone() {
               aria-label="필터"
               className="flex h-9 w-9 items-center justify-center rounded-full text-[18px] transition hover:bg-[#f8f4ee]"
               type="button"
-              onClick={() => setShowFilters((current) => !current)}
             >
               ☰
             </button>
@@ -246,106 +231,58 @@ function HomePhone() {
           </div>
         </header>
 
-        {showFilters ? (
-          <div className="mt-4 rounded-[24px] bg-[#fbf7f1] px-4 py-4">
-            <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Category
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["전체", "맛집", "명소", "루트"].map((category) => (
-                  <button
-                    key={category}
-                    className={[
-                      "rounded-full px-3.5 py-2 text-[13px] font-medium transition",
-                      selectedCategory === category
-                        ? "bg-[#f1eeff] text-[#5f51d5]"
-                        : "bg-white text-slate-600",
-                    ].join(" ")}
-                    type="button"
-                    onClick={() => setSelectedCategory(category)}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Region
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["전체", "수도권", "부산", "강원", "제주", "대전", "대구"].map((region) => (
-                  <button
-                    key={region}
-                    className={[
-                      "rounded-full px-3.5 py-2 text-[13px] font-medium transition",
-                      selectedRegion === region
-                        ? "bg-[#f1eeff] text-[#5f51d5]"
-                        : "bg-white text-slate-600",
-                    ].join(" ")}
-                    type="button"
-                    onClick={() => setSelectedRegion(region)}
-                  >
-                    {region}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="no-scrollbar -mx-1 mt-5 overflow-x-auto pb-1">
-          <div className="flex min-w-max gap-2 px-1">
-            {filterChips.map((chip) => {
-              const isActive =
-                chip === "전체"
-                  ? selectedCategory === "전체" && selectedRegion === "전체"
-                  : chip === "지역별"
-                    ? selectedRegion !== "전체"
-                    : chip === selectedCategory || chip === selectedRegion;
-
-              return (
+        <div className="mt-3 rounded-[24px] bg-[#fbf7f1] px-4 py-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8da1c4]">
+              Category
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {categoryOptions.map((category) => (
                 <button
-                  key={chip}
+                  key={category}
                   className={[
-                    "rounded-full px-4 py-2 text-sm font-medium transition whitespace-nowrap",
-                    isActive
-                      ? "bg-[#f1eeff] text-[#5f51d5] shadow-[0_8px_18px_rgba(95,81,213,0.12)]"
-                      : "bg-[#f7f1e8] text-slate-600 hover:bg-[#faf7f2]",
+                    "rounded-full px-4 py-2 text-[14px] font-medium transition",
+                    selectedCategory === category
+                      ? "bg-[#f1eeff] text-[#5f51d5]"
+                      : "bg-white text-slate-600",
                   ].join(" ")}
                   type="button"
-                  onClick={() => {
-                    if (chip === "지역별") {
-                      setShowFilters(true);
-                      return;
-                    }
-
-                    if (["전체", "맛집", "명소", "루트"].includes(chip)) {
-                      setSelectedCategory(chip);
-
-                      if (chip === "전체" && selectedRegion !== "전체") {
-                        setSelectedRegion("전체");
-                      }
-
-                      return;
-                    }
-
-                    setSelectedRegion(chip);
-                  }}
+                  onClick={() => setSelectedCategory(category)}
                 >
-                  {chip}
+                  {category}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8da1c4]">
+              Region
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {regionOptions.map((region) => (
+                <button
+                  key={region}
+                  className={[
+                    "rounded-full px-4 py-2 text-[14px] font-medium transition",
+                    selectedRegion === region
+                      ? "bg-[#f1eeff] text-[#5f51d5]"
+                      : "bg-white text-slate-600",
+                  ].join(" ")}
+                  type="button"
+                  onClick={() => setSelectedRegion(region)}
+                >
+                  {region}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="no-scrollbar mt-5 flex-1 overflow-y-auto pr-1">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[13px] font-medium text-slate-500">
-              총 {filteredCards.length}개 추천
+              {isLoadingFeed ? "추천 불러오는 중..." : `총 ${filteredCards.length}개 추천`}
             </p>
             {(selectedCategory !== "전체" || selectedRegion !== "전체") ? (
               <button
@@ -362,6 +299,11 @@ function HomePhone() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            {!isLoadingFeed && filteredCards.length === 0 ? (
+              <div className="col-span-2 rounded-[24px] bg-white px-5 py-10 text-center text-[14px] text-slate-500 shadow-[0_10px_24px_rgba(99,75,43,0.06)]">
+                현재 조건에 맞는 컨텐츠가 없어요.
+              </div>
+            ) : null}
             {filteredCards.map((card) => {
               const isHighlighted = highlightedCards.includes(card.id);
 
@@ -439,7 +381,7 @@ function HomePhone() {
         </div>
 
         <nav className="mt-3 border-t border-[#f1ebe2] pt-2">
-          <ul className="grid grid-cols-5 gap-1">
+          <ul className="grid grid-cols-4 gap-1">
             {tabItems.map((tab) => (
               <li key={tab.label}>
                 <RouteLink
@@ -722,6 +664,8 @@ function HomePhone() {
 }
 
 export function HomePage() {
+  const authUser = useAuthUser();
+
   return (
     <ShowcaseLayout phone={<HomePhone />}>
       <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm text-slate-700 backdrop-blur">
@@ -741,6 +685,54 @@ export function HomePage() {
         홈에서는 추천 카드와 카테고리 필터를 먼저 보여주고, 원하는 장소나 루트로
         바로 들어갈 수 있게 구성했습니다.
       </p>
+
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        {authUser ? (
+          <>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#d4deee] bg-white/80 px-5 py-3 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">{authUser.nickname}</span>
+              <span className="text-slate-400">·</span>
+              저장한 루트와 최근 검색을 이어서 볼 수 있어요
+            </div>
+            <button
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-white"
+              type="button"
+              onClick={async () => {
+                const refreshToken = getRefreshToken();
+
+                try {
+                  if (refreshToken) {
+                    await logout(refreshToken);
+                  }
+                } catch (error) {
+                  console.error("Failed to logout", error);
+                } finally {
+                  clearAuthSession();
+                }
+              }}
+            >
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full bg-[#5f51d5] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(95,81,213,0.3)] transition hover:bg-[#5243c8]"
+              href={buildPath.login()}
+            >
+              <p className="text-white">
+                로그인
+              </p>
+            </RouteLink>
+            <RouteLink
+              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
+              href={buildPath.signup()}
+            >
+              회원가입
+            </RouteLink>
+          </>
+        )}
+      </div>
     </ShowcaseLayout>
   );
 }

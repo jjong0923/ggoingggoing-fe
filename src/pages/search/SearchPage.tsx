@@ -1,11 +1,20 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
-import { navigateTo } from "../../shared/lib/router";
+import { getContents } from "../../shared/apis/contents";
 import {
-  SearchIcon,
-  SlidersIcon,
-  UserCircleIcon,
-} from "../../shared/ui/AppIcons";
+  getPopularSearches,
+  getRecentSearches,
+  searchContents,
+  searchContentsByFilter,
+} from "../../shared/apis/search";
+import type { ContentSummary } from "../../shared/apis/types";
+import {
+  getCategoryLabelFromContentType,
+  getContentTypeFromCategoryLabel,
+  getRegionIdFromLabel,
+} from "../../shared/lib/apiMappings";
+import { navigateTo } from "../../shared/lib/router";
+import { SearchIcon, SlidersIcon } from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
 import { ShowcaseLayout } from "../../shared/ui/ShowcaseLayout";
@@ -14,67 +23,23 @@ type SearchStage = "home" | "filters" | "results";
 
 type ResultCard = {
   category: "맛집" | "명소" | "루트";
+  hot: boolean;
   id: string;
-  imageIcon: string;
   subtitle: string;
   title: string;
+  viewCount: number;
 };
-
-const recentSearches = ["성심당", "속초 물회", "부산 당일치기"];
-const trendingKeywords = [
-  "전주 한옥마을",
-  "대구 뭉티기",
-  "속초 영금정",
-  "제주 산방산",
-];
 
 const regionOptions = ["전국", "수도권", "부산/경남", "강원", "제주", "전라", "충청"];
 const themeOptions = ["맛집", "명소", "루트", "힐링", "등산", "계곡", "축제"];
 const typeOptions = ["당일치기", "1박 2일", "혼자", "커플", "가족"];
 const sortOptions = ["추천순", "인기순", "최신순"] as const;
 
-const resultCards: ResultCard[] = [
-  {
-    id: "search-001",
-    imageIcon: "🍖",
-    category: "맛집",
-    subtitle: "부산 서면",
-    title: "부산 돼지국밥 골목",
-  },
-  {
-    id: "search-002",
-    imageIcon: "🌊",
-    category: "명소",
-    subtitle: "부산 수영구",
-    title: "광안리 해수욕장",
-  },
-  {
-    id: "search-003",
-    imageIcon: "🍜",
-    category: "맛집",
-    subtitle: "부산 동래구",
-    title: "밀면 맛집 투어",
-  },
-  {
-    id: "search-004",
-    imageIcon: "🏖",
-    category: "루트",
-    subtitle: "부산 해운대구",
-    title: "해운대 당일 루트",
-  },
-];
-
 const tabItems = [
   { icon: "⌂", label: "홈", href: buildPath.home(), active: false },
   { icon: "⌕", label: "검색", href: buildPath.search(), active: true },
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: false },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
-  {
-    icon: <UserCircleIcon className="h-[18px] w-[18px]" />,
-    label: "MY",
-    href: buildPath.my(),
-    active: false,
-  },
 ];
 
 const categoryTone: Record<ResultCard["category"], string> = {
@@ -106,6 +71,38 @@ function FilterChip({ active, children, onClick }: FilterChipProps) {
   );
 }
 
+function toCategory(contentType: ContentSummary["contentType"]): ResultCard["category"] {
+  return getCategoryLabelFromContentType(contentType);
+}
+
+function mapContentToResultCard(content: ContentSummary): ResultCard {
+  return {
+    id: String(content.id),
+    title: content.title,
+    subtitle: `${content.regionName} · ${content.themeName}`,
+    category: toCategory(content.contentType),
+    viewCount: content.viewCount,
+    hot: content.hot,
+  };
+}
+
+function sortResults(
+  cards: ResultCard[],
+  sort: (typeof sortOptions)[number],
+): ResultCard[] {
+  const copiedCards = [...cards];
+
+  if (sort === "인기순") {
+    return copiedCards.sort((left, right) => right.viewCount - left.viewCount);
+  }
+
+  if (sort === "최신순") {
+    return copiedCards.sort((left, right) => Number(right.id) - Number(left.id));
+  }
+
+  return copiedCards.sort((left, right) => Number(right.hot) - Number(left.hot));
+}
+
 function SearchPhone() {
   const [stage, setStage] = useState<SearchStage>("home");
   const [keyword, setKeyword] = useState("부산");
@@ -114,8 +111,18 @@ function SearchPhone() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>(["당일치기"]);
   const [selectedSort, setSelectedSort] =
     useState<(typeof sortOptions)[number]>("추천순");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
+  const [resultCards, setResultCards] = useState<ResultCard[]>([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const appliedFilters = [...selectedRegions, ...selectedThemes, ...selectedTypes];
+
+  const sortedResults = useMemo(
+    () => sortResults(resultCards, selectedSort),
+    [resultCards, selectedSort],
+  );
 
   const toggleItem = (
     list: string[],
@@ -124,6 +131,107 @@ function SearchPhone() {
   ) => {
     setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSearchHome = async () => {
+      try {
+        const [recent, popular] = await Promise.all([
+          getRecentSearches(),
+          getPopularSearches(),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setRecentSearches(recent);
+        setTrendingKeywords(popular.map((item) => item.keyword));
+      } catch (error) {
+        console.error("Failed to load search metadata", error);
+      }
+    };
+
+    void loadSearchHome();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (stage !== "results") {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadResults = async () => {
+      setIsLoadingResults(true);
+      setSearchError(null);
+
+      try {
+        const trimmedKeyword = keyword.trim();
+        const hasRegionFilter =
+          selectedRegions.length > 0 && !selectedRegions.includes("전국");
+        const activeCategory = selectedThemes.find((theme) =>
+          ["맛집", "명소", "루트"].includes(theme),
+        );
+
+        const contents =
+          trimmedKeyword.length > 0
+            ? await searchContents(trimmedKeyword)
+            : hasRegionFilter || activeCategory
+              ? await searchContentsByFilter({
+                  regionId: hasRegionFilter
+                    ? getRegionIdFromLabel(selectedRegions[0])
+                    : undefined,
+                  contentType: activeCategory
+                    ? getContentTypeFromCategoryLabel(activeCategory)
+                    : undefined,
+                })
+              : await getContents();
+
+        if (!isMounted) {
+          return;
+        }
+
+        const filteredContents = contents.filter((content) => {
+          const category = toCategory(content.contentType);
+          const matchesRegion =
+            selectedRegions.length === 0 ||
+            selectedRegions.includes("전국") ||
+            selectedRegions.some((region) =>
+              `${content.regionName} ${content.themeName}`.includes(region.replace("/경남", "")),
+            );
+          const matchesTheme =
+            selectedThemes.length === 0 ||
+            selectedThemes.some((theme) => category === theme);
+
+          return matchesRegion && matchesTheme;
+        });
+
+        setResultCards(filteredContents.map(mapContentToResultCard));
+      } catch (error) {
+        console.error("Failed to load search results", error);
+        if (isMounted) {
+          setSearchError("검색 결과를 불러오지 못했어요.");
+          setResultCards([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingResults(false);
+        }
+      }
+    };
+
+    void loadResults();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [keyword, selectedRegions, selectedThemes, selectedTypes, stage]);
 
   return (
     <PhoneFrame className="max-h-[850px] max-w-[430px]">
@@ -172,18 +280,27 @@ function SearchPhone() {
           <div className="no-scrollbar mt-6 flex-1 overflow-y-auto">
             <section>
               <h2 className="text-sm font-semibold text-slate-700">최근 검색</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {recentSearches.map((item) => (
-                  <button
-                    key={item}
-                    className="rounded-full bg-[#f7f1e8] px-4 py-2 text-[13px] text-slate-600"
-                    type="button"
-                    onClick={() => setKeyword(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
+              {recentSearches.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {recentSearches.map((item) => (
+                    <button
+                      key={item}
+                      className="rounded-full bg-[#f7f1e8] px-4 py-2 text-[13px] text-slate-600"
+                      type="button"
+                      onClick={() => {
+                        setKeyword(item);
+                        setStage("results");
+                      }}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-[13px] text-slate-500">
+                  로그인 후 최근 검색어가 여기에 표시돼요.
+                </p>
+              )}
             </section>
 
             <section className="mt-7 pt-5">
@@ -296,7 +413,9 @@ function SearchPhone() {
             </div>
 
             <div className="mt-4 flex items-center justify-between">
-              <p className="text-[13px] font-medium text-slate-600">결과 24개</p>
+              <p className="text-[13px] font-medium text-slate-600">
+                {isLoadingResults ? "검색 중..." : `결과 ${sortedResults.length}개`}
+              </p>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -317,15 +436,27 @@ function SearchPhone() {
               ))}
             </div>
 
+            {searchError ? (
+              <div className="mt-4 rounded-[18px] bg-[#fff1ee] px-4 py-3 text-[13px] text-[#b3543d]">
+                {searchError}
+              </div>
+            ) : null}
+
             <div className="mt-5 space-y-2">
-              {resultCards.map((card) => (
+              {!isLoadingResults && sortedResults.length === 0 ? (
+                <div className="rounded-[18px] bg-white px-4 py-10 text-center text-[14px] text-slate-500 shadow-[0_8px_20px_rgba(99,75,43,0.04)]">
+                  조건에 맞는 검색 결과가 없어요.
+                </div>
+              ) : null}
+
+              {sortedResults.map((card) => (
                 <RouteLink
                   key={card.id}
                   className="flex items-center gap-3 rounded-[18px] bg-white px-3 py-3 shadow-[0_8px_20px_rgba(99,75,43,0.04)]"
                   href={buildPath.contentDetail(card.id)}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ece7df] text-xl">
-                    {card.imageIcon}
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ece7df] text-sm font-semibold text-slate-700">
+                    {card.title.slice(0, 2)}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-[14px] font-semibold text-slate-900">
@@ -333,14 +464,19 @@ function SearchPhone() {
                     </h3>
                     <p className="mt-1 text-[12px] text-slate-500">⌖ {card.subtitle}</p>
                   </div>
-                  <span
-                    className={[
-                      "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                      categoryTone[card.category],
-                    ].join(" ")}
-                  >
-                    {card.category}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={[
+                        "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                        categoryTone[card.category],
+                      ].join(" ")}
+                    >
+                      {card.category}
+                    </span>
+                    {card.hot ? (
+                      <span className="text-[10px] font-semibold text-[#ec7e52]">HOT</span>
+                    ) : null}
+                  </div>
                 </RouteLink>
               ))}
             </div>
@@ -348,7 +484,7 @@ function SearchPhone() {
         ) : null}
 
         <nav className="mt-3 border-t border-[#f1ebe2] pt-2">
-          <ul className="grid grid-cols-5 gap-1">
+          <ul className="grid grid-cols-4 gap-1">
             {tabItems.map((tab) => (
               <li key={tab.label}>
                 <RouteLink
@@ -398,8 +534,8 @@ export function SearchPage() {
       </h1>
 
       <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 md:text-lg">
-        최근 검색, 인기 검색어, 지역과 테마 필터를 한 화면 안에서 빠르게 전환하고
-        결과 리스트까지 자연스럽게 이어지는 검색 흐름입니다.
+        인기 검색어와 키워드 검색, 인증이 필요한 최근 검색어까지 실제 API 응답으로
+        바꾸고 결과 리스트를 그 흐름에 맞춰 연결했습니다.
       </p>
     </ShowcaseLayout>
   );
