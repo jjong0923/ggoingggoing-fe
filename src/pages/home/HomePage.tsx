@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
+import {
+  addBookmark,
+  deleteBookmark,
+  getBookmarks,
+} from "../../shared/apis/bookmarks";
 import { getContents, getHotContents } from "../../shared/apis/contents";
-import type { ContentSummary } from "../../shared/apis/types";
+import type { BookmarkSummary, ContentSummary } from "../../shared/apis/types";
 import { logout } from "../../shared/apis/auth";
+import {
+  addBookmarkToFolder,
+  createBookmarkFolder,
+  removeBookmarkFromAllFolders,
+  useBookmarkFolders,
+} from "../../shared/lib/bookmarkFolders";
 import {
   clearAuthSession,
   getRefreshToken,
@@ -13,6 +24,7 @@ import {
   getContentTypeFromCategoryLabel,
   getRegionIdFromLabel,
 } from "../../shared/lib/apiMappings";
+import { navigateTo } from "../../shared/lib/router";
 import {
   BellIcon,
   SearchIcon,
@@ -29,6 +41,13 @@ type FeedCard = {
   imageLabel: string;
   location: string;
   region: string;
+  title: string;
+};
+
+type BookmarkMap = Record<string, BookmarkSummary>;
+
+type PendingFolderSelection = {
+  contentId: string;
   title: string;
 };
 
@@ -98,10 +117,21 @@ function FilterChip({
 }
 
 function HomePhone() {
+  const authUser = useAuthUser();
+  const bookmarkFolders = useBookmarkFolders();
   const [feedCards, setFeedCards] = useState<FeedCard[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
+  const [bookmarksByContentId, setBookmarksByContentId] = useState<BookmarkMap>(
+    {},
+  );
+  const [pendingBookmarkIds, setPendingBookmarkIds] = useState<string[]>([]);
+  const [pendingFolderSelection, setPendingFolderSelection] =
+    useState<PendingFolderSelection | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState("default-folder");
+  const [newFolderName, setNewFolderName] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("전체");
   const [selectedRegion, setSelectedRegion] = useState<string>("전체");
+  const [isRegionExpanded, setIsRegionExpanded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchStage, setSearchStage] = useState<"home" | "filters" | "results">("home");
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -147,9 +177,46 @@ function HomePhone() {
   };
 
   useEffect(() => {
+    if (!authUser) {
+      setBookmarksByContentId({});
+      setPendingBookmarkIds([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadBookmarks = async () => {
+      try {
+        const bookmarks = await getBookmarks();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setBookmarksByContentId(
+          bookmarks.reduce<BookmarkMap>((accumulator, bookmark) => {
+            accumulator[String(bookmark.contentId)] = bookmark;
+            return accumulator;
+          }, {}),
+        );
+      } catch (error) {
+        console.error("Failed to load bookmarks", error);
+      }
+    };
+
+    void loadBookmarks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser]);
+
+  useEffect(() => {
     let isMounted = true;
 
     const loadContents = async () => {
+      setIsLoadingFeed(true);
+
       try {
         const shouldLoadHot =
           selectedCategory === "전체" && selectedRegion === "전체";
@@ -185,7 +252,91 @@ function HomePhone() {
     return () => {
       isMounted = false;
     };
-  }, [feedCards, searchKeyword, searchRegions, searchThemes]);
+  }, [selectedCategory, selectedRegion]);
+
+  const handleBookmarkToggle = async (contentId: string) => {
+    if (!authUser) {
+      navigateTo(buildPath.login());
+      return;
+    }
+
+    if (pendingBookmarkIds.includes(contentId)) {
+      return;
+    }
+
+    const currentBookmark = bookmarksByContentId[contentId];
+
+    setPendingBookmarkIds((current) => [...current, contentId]);
+
+    try {
+      if (currentBookmark) {
+        await deleteBookmark(currentBookmark.bookmarkId);
+        removeBookmarkFromAllFolders(currentBookmark.bookmarkId);
+        setBookmarksByContentId((current) => {
+          const next = { ...current };
+          delete next[contentId];
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error("Failed to toggle bookmark", error);
+    } finally {
+      setPendingBookmarkIds((current) =>
+        current.filter((item) => item !== contentId),
+      );
+    }
+  };
+
+  const handleOpenBookmarkFolderModal = (contentId: string, title: string) => {
+    if (!authUser) {
+      navigateTo(buildPath.login());
+      return;
+    }
+
+    setSelectedFolderId(bookmarkFolders[0]?.id ?? "default-folder");
+    setNewFolderName("");
+    setPendingFolderSelection({ contentId, title });
+  };
+
+  const handleConfirmBookmarkFolder = async () => {
+    if (!pendingFolderSelection) {
+      return;
+    }
+
+    const { contentId } = pendingFolderSelection;
+
+    if (pendingBookmarkIds.includes(contentId)) {
+      return;
+    }
+
+    setPendingBookmarkIds((current) => [...current, contentId]);
+
+    try {
+      let folderId = selectedFolderId;
+
+      if (newFolderName.trim()) {
+        const nextFolder = createBookmarkFolder(newFolderName);
+        if (nextFolder) {
+          folderId = nextFolder.id;
+        }
+      }
+
+      const nextBookmark = await addBookmark(Number(contentId));
+      addBookmarkToFolder(folderId, nextBookmark.bookmarkId);
+      setBookmarksByContentId((current) => ({
+        ...current,
+        [contentId]: nextBookmark,
+      }));
+      setPendingFolderSelection(null);
+      setNewFolderName("");
+    } catch (error) {
+      console.error("Failed to add bookmark", error);
+    } finally {
+      setPendingBookmarkIds((current) =>
+        current.filter((item) => item !== contentId),
+      );
+    }
+  };
 
   return (
     <PhoneFrame className="max-h-[850px] max-w-[430px]">
@@ -203,13 +354,6 @@ function HomePhone() {
             <span className="text-xl">🐷</span>
           </div>
           <div className="flex items-center gap-3 text-xl text-slate-700">
-            <button
-              aria-label="필터"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[18px] transition hover:bg-[#f8f4ee]"
-              type="button"
-            >
-              ☰
-            </button>
             <button
               aria-label="검색"
               className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-[#f8f4ee]"
@@ -256,26 +400,53 @@ function HomePhone() {
           </div>
 
           <div className="mt-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8da1c4]">
-              Region
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {regionOptions.map((region) => (
-                <button
-                  key={region}
-                  className={[
-                    "rounded-full px-4 py-2 text-[14px] font-medium transition",
-                    selectedRegion === region
-                      ? "bg-[#f1eeff] text-[#5f51d5]"
-                      : "bg-white text-slate-600",
-                  ].join(" ")}
-                  type="button"
-                  onClick={() => setSelectedRegion(region)}
-                >
-                  {region}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8da1c4]">
+                  Region
+                </p>
+                <p className="mt-1 text-[12px] text-slate-500">
+                  {selectedRegion === "전체"
+                    ? "지역 필터를 열어 원하는 권역만 골라볼 수 있어요"
+                    : `${selectedRegion} 기준으로 추천을 보고 있어요`}
+                </p>
+              </div>
+              <button
+                className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[#5f51d5] transition hover:bg-[#f6f1ff]"
+                type="button"
+                onClick={() => setIsRegionExpanded((current) => !current)}
+              >
+                {isRegionExpanded ? "접기" : "펼치기"}
+              </button>
             </div>
+
+            {isRegionExpanded ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {regionOptions.map((region) => (
+                  <button
+                    key={region}
+                    className={[
+                      "rounded-full px-4 py-2 text-[14px] font-medium transition",
+                      selectedRegion === region
+                        ? "bg-[#f1eeff] text-[#5f51d5]"
+                        : "bg-white text-slate-600",
+                    ].join(" ")}
+                    type="button"
+                    onClick={() => setSelectedRegion(region)}
+                  >
+                    {region}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button
+                className="mt-3 inline-flex rounded-full bg-white px-4 py-2 text-[14px] font-medium text-slate-600"
+                type="button"
+                onClick={() => setIsRegionExpanded(true)}
+              >
+                현재 지역: {selectedRegion}
+              </button>
+            )}
           </div>
         </div>
 
@@ -306,6 +477,8 @@ function HomePhone() {
             ) : null}
             {filteredCards.map((card) => {
               const isHighlighted = highlightedCards.includes(card.id);
+              const isBookmarked = Boolean(bookmarksByContentId[card.id]);
+              const isPendingBookmark = pendingBookmarkIds.includes(card.id);
 
               return (
                 <RouteLink
@@ -366,10 +539,24 @@ function HomePhone() {
                         ) : null}
                         <button
                           aria-label={`${card.title} 찜하기`}
-                          className="text-lg leading-none text-[#ff7da6]"
+                          className={[
+                            "text-lg leading-none transition",
+                            isBookmarked ? "text-[#ff7da6]" : "text-slate-300",
+                            isPendingBookmark ? "opacity-50" : "",
+                          ].join(" ")}
                           type="button"
+                          onClick={async (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (isBookmarked) {
+                              await handleBookmarkToggle(card.id);
+                              return;
+                            }
+
+                            handleOpenBookmarkFolderModal(card.id, card.title);
+                          }}
                         >
-                          ♥
+                          {isBookmarked ? "♥" : "♡"}
                         </button>
                       </div>
                     </div>
@@ -385,12 +572,13 @@ function HomePhone() {
             {tabItems.map((tab) => (
               <li key={tab.label}>
                 <RouteLink
-                  className="flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 transition hover:bg-[#faf7f2]"
+                  className="flex h-[62px] flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 transition hover:bg-[#faf7f2]"
                   href={tab.href}
                 >
                   <span
                     className={[
-                      "text-[18px] leading-none",
+                      "flex items-center justify-center leading-none",
+                      tab.label === "탐색" ? "h-6 text-[22px]" : "h-6 text-[18px]",
                       tab.active ? "text-[#5f51d5]" : "text-slate-500",
                     ].join(" ")}
                   >
@@ -398,7 +586,10 @@ function HomePhone() {
                   </span>
                   <span
                     className={[
-                      "text-[11px] font-semibold leading-none",
+                      "leading-none",
+                      tab.label === "탐색"
+                        ? "text-[12px] font-semibold"
+                        : "text-[11px] font-semibold",
                       tab.active ? "text-[#5f51d5]" : "text-slate-500",
                     ].join(" ")}
                   >
@@ -655,6 +846,77 @@ function HomePhone() {
                   </div>
                 </div>
               ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {pendingFolderSelection ? (
+          <div className="absolute inset-0 z-30 flex items-end bg-black/28 p-4">
+            <div className="w-full rounded-[28px] bg-white px-5 py-5 shadow-[0_24px_48px_rgba(50,40,30,0.2)]">
+              <p className="text-[12px] font-semibold tracking-[0.2em] text-[#8da1c4] uppercase">
+                Save To Folder
+              </p>
+              <h3 className="mt-2 text-[20px] font-semibold tracking-[-0.04em] text-slate-900">
+                {pendingFolderSelection.title}
+              </h3>
+              <p className="mt-2 text-[13px] leading-5 text-slate-500">
+                찜할 폴더를 고르거나 새 폴더를 만들어서 바로 넣을 수 있어요.
+              </p>
+
+              <div className="mt-4 space-y-2">
+                {bookmarkFolders.map((folder) => (
+                  <button
+                    key={folder.id}
+                    className={[
+                      "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left transition",
+                      selectedFolderId === folder.id
+                        ? "border-[#d8d0ff] bg-[#f1eeff]"
+                        : "border-[#ebe3d8] bg-white",
+                    ].join(" ")}
+                    type="button"
+                    onClick={() => setSelectedFolderId(folder.id)}
+                  >
+                    <span className="text-[14px] font-semibold text-slate-900">
+                      {folder.name}
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      {folder.bookmarkIds.length}개
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-[18px] bg-[#fbf7f1] px-4 py-4">
+                <p className="text-[12px] font-semibold text-slate-600">
+                  새 폴더 만들기
+                </p>
+                <input
+                  className="mt-3 w-full rounded-2xl border border-[#e8dfd3] bg-white px-4 py-3 text-[14px] text-slate-900 outline-none"
+                  placeholder="예: 이번 주말 가고 싶은 곳"
+                  value={newFolderName}
+                  onChange={(event) => setNewFolderName(event.target.value)}
+                />
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  className="rounded-[18px] border border-[#d9d0c5] px-4 py-3 text-[14px] font-semibold text-slate-700"
+                  type="button"
+                  onClick={() => {
+                    setPendingFolderSelection(null);
+                    setNewFolderName("");
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  className="rounded-[18px] bg-[#5f51d5] px-4 py-3 text-[14px] font-semibold text-white"
+                  type="button"
+                  onClick={handleConfirmBookmarkFolder}
+                >
+                  폴더에 담기
+                </button>
+              </div>
             </div>
           </div>
         ) : null}

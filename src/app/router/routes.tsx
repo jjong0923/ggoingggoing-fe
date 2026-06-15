@@ -101,6 +101,7 @@ export const appRoutes: AppRoute[] = [
     path: routePaths.routeResult,
     title: "AI 루트 결과",
     description: "지도와 최적 동선 결과",
+    layout: "immersive",
     render: (params) => <RouteResultPage routeId={params.routeId} />,
   },
   {

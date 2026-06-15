@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
 import {
-  clearAuthSession,
-  getRefreshToken,
-  useAuthUser,
-} from "../../shared/lib/authSession";
+  getMockRouteCounts,
+  getMockRoutes,
+  getMockRouteTitles,
+  getThemeRouteFeedCards,
+} from "../../shared/mocks/routes";
 import { SearchIcon, SlidersIcon } from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
@@ -16,15 +17,33 @@ type FeedCard = {
   id: string;
   likeCount: string;
   location: string;
+  routeId?: string;
   subtitle: string;
   title: string;
 };
+
+type RouteSearchCard = FeedCard & {
+  themes: string[];
+  tripType: string;
+};
+
+const routeSubthemeLabels = [
+  "도보 루트",
+  "카페 투어",
+  "맛집 코스",
+  "야경 코스",
+] as const;
+
+const routeCounts = getMockRouteCounts();
+const routeFeedCardsBySubtheme = getThemeRouteFeedCards();
+const mockRoutes = getMockRoutes();
 
 type ThemeGroup = {
   countLabel: string;
   description: string;
   id: string;
   palette: [string, string, string];
+  previewHighlights?: string[];
   previewTags: string[];
   subthemes: { countLabel: string; label: string }[];
   title: string;
@@ -64,20 +83,21 @@ const themeGroups: ThemeGroup[] = [
   {
     id: "route",
     title: "루트",
-    countLabel: "콘텐츠 57개",
+    countLabel: `콘텐츠 ${routeCounts.total}개`,
     description: "당일 동선, 카페 투어, 야경 코스를 한 번에 탐색",
     palette: ["#abd3f5", "#76b6ec", "#1d8bdc"],
+    previewHighlights: getMockRouteTitles(3),
     previewTags: ["도보 루트", "카페 투어", "맛집 코스"],
     subthemes: [
-      { label: "도보 루트", countLabel: "12개" },
-      { label: "카페 투어", countLabel: "14개" },
-      { label: "맛집 코스", countLabel: "19개" },
-      { label: "야경 코스", countLabel: "12개" },
+      { label: "도보 루트", countLabel: `${routeCounts.bySubtheme["도보 루트"]}개` },
+      { label: "카페 투어", countLabel: `${routeCounts.bySubtheme["카페 투어"]}개` },
+      { label: "맛집 코스", countLabel: `${routeCounts.bySubtheme["맛집 코스"]}개` },
+      { label: "야경 코스", countLabel: `${routeCounts.bySubtheme["야경 코스"]}개` },
     ],
   },
 ];
 
-const regionOptions = ["전국", "수도권", "부산", "대구", "강원", "제주"];
+const regionOptions = ["전국", "수도권", "부산", "대전", "강원", "전라", "제주"];
 const searchRegionOptions = [
   "전국",
   "수도권",
@@ -97,13 +117,8 @@ const searchThemeOptions = [
   "축제",
 ];
 const searchTypeOptions = ["당일치기", "1박 2일", "혼자", "커플", "가족"];
-const recentSearches = ["성심당", "속초 물회", "부산 당일치기"];
-const trendingKeywords = [
-  "전주 한옥마을",
-  "대구 뭉티기",
-  "속초 영금정",
-  "제주 산방산",
-];
+const recentSearches = getMockRouteTitles(3);
+const trendingKeywords = getMockRouteTitles(4);
 const sortOptions = ["추천순", "인기순", "최신순"] as const;
 
 const feedCardsBySubtheme: Record<string, FeedCard[]> = {
@@ -407,126 +422,10 @@ const feedCardsBySubtheme: Record<string, FeedCard[]> = {
       likeCount: "478",
     },
   ],
-  "도보 루트": [
-    {
-      id: "theme-route-1",
-      title: "전주 반나절 루트",
-      subtitle: "한옥마을 중심",
-      location: "전주시",
-      likeCount: "418",
-    },
-    {
-      id: "theme-route-2",
-      title: "광안리 산책 루트",
-      subtitle: "바다와 카페",
-      location: "부산 수영구",
-      likeCount: "552",
-    },
-    {
-      id: "theme-route-3",
-      title: "속초 항구 루트",
-      subtitle: "시장 + 바다",
-      location: "속초시",
-      likeCount: "300",
-    },
-    {
-      id: "theme-route-4",
-      title: "성수 감성 코스",
-      subtitle: "전시와 카페",
-      location: "서울 성동",
-      likeCount: "363",
-    },
-  ],
-  "카페 투어": [
-    {
-      id: "theme-cafe-1",
-      title: "해운대 카페 4선",
-      subtitle: "오션뷰 집중",
-      location: "부산 해운대",
-      likeCount: "701",
-    },
-    {
-      id: "theme-cafe-2",
-      title: "대전 베이커리 루프",
-      subtitle: "빵지순례",
-      location: "대전 중구",
-      likeCount: "276",
-    },
-    {
-      id: "theme-cafe-3",
-      title: "제주 서쪽 카페",
-      subtitle: "노을 타임",
-      location: "제주시",
-      likeCount: "499",
-    },
-    {
-      id: "theme-cafe-4",
-      title: "서울 디저트 코스",
-      subtitle: "반나절 코스",
-      location: "서울 마포",
-      likeCount: "324",
-    },
-  ],
-  "맛집 코스": [
-    {
-      id: "theme-foodroute-1",
-      title: "부산 시장 먹방",
-      subtitle: "시장 중심",
-      location: "부산 중구",
-      likeCount: "653",
-    },
-    {
-      id: "theme-foodroute-2",
-      title: "대구 로컬 미식",
-      subtitle: "뭉티기와 국수",
-      location: "대구 중구",
-      likeCount: "391",
-    },
-    {
-      id: "theme-foodroute-3",
-      title: "제주 흑돼지 코스",
-      subtitle: "고기 집중",
-      location: "제주시",
-      likeCount: "514",
-    },
-    {
-      id: "theme-foodroute-4",
-      title: "전주 한끼 루트",
-      subtitle: "빵과 국밥",
-      location: "전주시",
-      likeCount: "208",
-    },
-  ],
-  "야경 코스": [
-    {
-      id: "theme-nightroute-1",
-      title: "광안리 야경 루트",
-      subtitle: "브리지 뷰",
-      location: "부산 수영구",
-      likeCount: "733",
-    },
-    {
-      id: "theme-nightroute-2",
-      title: "서울 루프탑 나이트",
-      subtitle: "도심 라이트",
-      location: "서울 용산",
-      likeCount: "448",
-    },
-    {
-      id: "theme-nightroute-3",
-      title: "대구 야간 드라이브",
-      subtitle: "전망대 포함",
-      location: "대구 수성구",
-      likeCount: "217",
-    },
-    {
-      id: "theme-nightroute-4",
-      title: "제주 해변 야경",
-      subtitle: "조용한 밤 산책",
-      location: "제주시",
-      likeCount: "302",
-    },
-  ],
+  "도보 루트": routeFeedCardsBySubtheme["도보 루트"],
+  "카페 투어": routeFeedCardsBySubtheme["카페 투어"],
+  "맛집 코스": routeFeedCardsBySubtheme["맛집 코스"],
+  "야경 코스": routeFeedCardsBySubtheme["야경 코스"],
 };
 
 const tabItems = [
@@ -536,7 +435,63 @@ const tabItems = [
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
 ];
 
-const searchableCards = Object.values(feedCardsBySubtheme).flat();
+function routeMatchesExploreRegion(region: string, location: string) {
+  if (region === "전체" || region === "전국") {
+    return true;
+  }
+
+  if (region === "수도권") {
+    return location.includes("서울") || location.includes("인천") || location.includes("경기");
+  }
+
+  if (region === "전라") {
+    return location.includes("전주") || location.includes("전북") || location.includes("전남");
+  }
+
+  return location.includes(region);
+}
+
+const routeSearchCards: RouteSearchCard[] = mockRoutes.map((route) => {
+  const hasFoodStop = route.places.some(
+    (place) => place.placeType === "RESTAURANT" || place.placeType === "CAFE",
+  );
+  const hasSpotStop = route.places.some((place) => place.placeType === "ATTRACTION");
+  const themes = ["루트"];
+
+  if (hasFoodStop) {
+    themes.push("맛집");
+  }
+
+  if (hasSpotStop) {
+    themes.push("명소");
+  }
+
+  if (
+    route.title.includes("힐링") ||
+    route.summary.includes("천천히") ||
+    route.summary.includes("여유")
+  ) {
+    themes.push("힐링");
+  }
+
+  return {
+    id: `route-search-${route.routeId}`,
+    routeId: String(route.routeId),
+    title: route.title.replace(" 루트", ""),
+    subtitle: `${route.tripDurationType === "DAY_TRIP" ? "당일치기" : "1박 2일"} · 장소 ${route.places.length}곳`,
+    location: route.regionLabel,
+    likeCount: String(route.places.length),
+    themes,
+    tripType:
+      route.tripDurationType === "DAY_TRIP" ? "당일치기" : "1박 2일",
+  };
+});
+
+function getCardHref(card: FeedCard) {
+  return card.routeId
+    ? buildPath.routeResult(card.routeId)
+    : buildPath.contentDetail(card.id);
+}
 
 function FilterChip({
   active,
@@ -582,16 +537,62 @@ function ThemePhone() {
   const [selectedSubtheme, setSelectedSubtheme] = useState("고기/구이");
   const [selectedRegions, setSelectedRegions] = useState<string[]>(["부산"]);
 
+  const filteredRouteCards = useMemo(() => {
+    if (selectedHomeRegion === "전체") {
+      return routeSearchCards;
+    }
+
+    return routeSearchCards.filter((card) =>
+      routeMatchesExploreRegion(selectedHomeRegion, card.location),
+    );
+  }, [selectedHomeRegion]);
+
+  const routeThemeGroup = useMemo<ThemeGroup>(() => {
+    const previewHighlights = filteredRouteCards
+      .slice(0, 3)
+      .map((card) => card.title);
+
+    return {
+      id: "route",
+      title: "루트",
+      countLabel: `콘텐츠 ${filteredRouteCards.length}개`,
+      description:
+        selectedHomeRegion === "전체"
+          ? "당일 동선, 카페 투어, 야경 코스를 한 번에 탐색"
+          : `${selectedHomeRegion} 기준으로 바로 떠날 수 있는 루트를 모아봤어요`,
+      palette: ["#abd3f5", "#76b6ec", "#1d8bdc"],
+      previewHighlights:
+        previewHighlights.length > 0
+          ? previewHighlights
+          : ["조건에 맞는", "루트를", "준비중"],
+      previewTags: ["도보 루트", "카페 투어", "맛집 코스"],
+      subthemes: routeSubthemeLabels.map((label) => ({
+        label,
+        countLabel: `${filteredRouteCards.filter((card) => card.subtitle.includes("당일치기") || card.subtitle.includes("1박 2일")).filter((card) => {
+          const route = mockRoutes.find((item) => String(item.routeId) === card.routeId);
+          return route?.subthemes.includes(label) ?? false;
+        }).length}개`,
+      })),
+    };
+  }, [filteredRouteCards, selectedHomeRegion]);
+
+  const mergedThemeGroups = useMemo(
+    () => themeGroups.map((theme) => (theme.id === "route" ? routeThemeGroup : theme)),
+    [routeThemeGroup],
+  );
+
   const currentTheme =
-    themeGroups.find((theme) => theme.id === selectedThemeId) ?? themeGroups[0];
+    mergedThemeGroups.find((theme) => theme.id === selectedThemeId) ?? mergedThemeGroups[0];
 
   const visibleThemeGroups = useMemo(() => {
     if (selectedHomeCategory === "전체") {
-      return themeGroups;
+      return [...mergedThemeGroups].sort((left, right) =>
+        left.id === "route" ? -1 : right.id === "route" ? 1 : 0,
+      );
     }
 
-    return themeGroups.filter((theme) => theme.title === selectedHomeCategory);
-  }, [selectedHomeCategory]);
+    return mergedThemeGroups.filter((theme) => theme.title === selectedHomeCategory);
+  }, [mergedThemeGroups, selectedHomeCategory]);
 
   const feedCards = useMemo(() => {
     const cards =
@@ -603,7 +604,7 @@ function ThemePhone() {
 
     const activeRegions =
       selectedRegions.length > 0
-        ? selectedRegions
+        ? selectedRegions.filter((region) => region !== "전국" && region !== "전체")
         : selectedHomeRegion !== "전체"
           ? [selectedHomeRegion]
           : [];
@@ -673,7 +674,7 @@ function ThemePhone() {
   const searchResults = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
 
-    return searchableCards.filter((card) => {
+    return routeSearchCards.filter((card) => {
       const matchesKeyword =
         keyword.length === 0 ||
         [card.title, card.subtitle, card.location]
@@ -682,13 +683,22 @@ function ThemePhone() {
           .includes(keyword);
       const matchesRegion =
         searchRegions.length === 0 ||
+        searchRegions.includes("전국") ||
         searchRegions.some((region) =>
           card.location.includes(region.split("/")[0] ?? region),
         );
+      const matchesTheme =
+        searchThemes.length === 0 ||
+        searchThemes.every((theme) =>
+          ["등산", "계곡", "축제"].includes(theme) ? false : card.themes.includes(theme),
+        );
+      const matchesTripType =
+        searchTypes.length === 0 ||
+        searchTypes.some((type) => type === card.tripType);
 
-      return matchesKeyword && matchesRegion;
+      return matchesKeyword && matchesRegion && matchesTheme && matchesTripType;
     });
-  }, [searchKeyword, searchRegions]);
+  }, [searchKeyword, searchRegions, searchThemes, searchTypes]);
 
   return (
     <PhoneFrame className="max-h-[850px] max-w-[430px]">
@@ -841,10 +851,10 @@ function ThemePhone() {
                     {theme.palette.map((color, index) => (
                       <div
                         key={`${theme.id}-${color}`}
-                        className="flex h-10 items-center justify-center rounded-2xl text-[10px] font-semibold text-white/90"
+                        className="flex h-12 items-center justify-center rounded-2xl px-2 text-center text-[10px] font-semibold text-white/90"
                         style={{ backgroundColor: color }}
                       >
-                        컷 {index + 1}
+                        {theme.previewHighlights?.[index] ?? `컷 ${index + 1}`}
                       </div>
                     ))}
                   </div>
@@ -1052,7 +1062,7 @@ function ThemePhone() {
                   <RouteLink
                     key={card.id}
                     className="overflow-hidden rounded-[22px] bg-white shadow-[0_10px_24px_rgba(99,75,43,0.06)]"
-                    href={buildPath.contentDetail(card.id)}
+                    href={getCardHref(card)}
                   >
                     <div
                       className="h-24"
@@ -1373,7 +1383,7 @@ function ThemePhone() {
                       <RouteLink
                         key={card.id}
                         className="flex items-center gap-3 rounded-[18px] bg-white px-3 py-3 shadow-[0_8px_20px_rgba(99,75,43,0.04)]"
-                        href={buildPath.contentDetail(card.id)}
+                        href={getCardHref(card)}
                       >
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ece7df] text-sm font-semibold text-slate-700">
                           {card.title.slice(0, 2)}
@@ -1403,8 +1413,6 @@ function ThemePhone() {
 }
 
 export function ThemePage() {
-  const authUser = useAuthUser();
-
   return (
     <ShowcaseLayout phone={<ThemePhone />}>
       <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm text-slate-700 backdrop-blur">
@@ -1424,54 +1432,6 @@ export function ThemePage() {
         맛집, 명소, 루트 중 큰 테마를 먼저 고르고, 서브테마와 지역을 더해 원하는
         분위기의 콘텐츠만 빠르게 좁혀보는 탐색 흐름입니다.
       </p>
-
-      <div className="mt-8 flex flex-wrap items-center gap-3">
-        {authUser ? (
-          <>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#d4deee] bg-white/80 px-5 py-3 text-sm text-slate-700">
-              <span className="font-semibold text-slate-900">
-                {authUser.nickname}
-              </span>
-              <span className="text-slate-400">·</span>
-              저장한 루트와 최근 검색을 이어서 볼 수 있어요
-            </div>
-            <button
-              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-white"
-              type="button"
-              onClick={async () => {
-                const refreshToken = getRefreshToken();
-
-                try {
-                  if (refreshToken) {
-                    await logout(refreshToken);
-                  }
-                } catch (error) {
-                  console.error("Failed to logout", error);
-                } finally {
-                  clearAuthSession();
-                }
-              }}
-            >
-              로그아웃
-            </button>
-          </>
-        ) : (
-          <>
-            <RouteLink
-              className="inline-flex items-center justify-center rounded-full bg-[#5f51d5] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(95,81,213,0.3)] transition hover:bg-[#5243c8]"
-              href={buildPath.login()}
-            >
-              <p className="text-white">로그인</p>
-            </RouteLink>
-            <RouteLink
-              className="inline-flex items-center justify-center rounded-full border border-[#d9cdbd] bg-white/80 px-6 py-3.5 text-sm font-medium text-slate-700 transition hover:bg-white"
-              href={buildPath.signup()}
-            >
-              회원가입
-            </RouteLink>
-          </>
-        )}
-      </div>
     </ShowcaseLayout>
   );
 }

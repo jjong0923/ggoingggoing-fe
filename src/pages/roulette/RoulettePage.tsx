@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { logout } from "../../shared/apis/auth";
+import { buildPath } from "../../app/router/routePaths";
+import { getRouteDetail } from "../../shared/apis/routes";
 import {
   clearAuthSession,
   getRefreshToken,
   useAuthUser,
 } from "../../shared/lib/authSession";
-import { buildPath } from "../../app/router/routePaths";
+import {
+  getCustomRouteBySourceRouteId,
+  saveRouteDetailAsCustomRoute,
+  useCustomRoutes,
+} from "../../shared/lib/customRoutes";
+import { navigateTo } from "../../shared/lib/router";
+import { getMockRouletteRoutes } from "../../shared/mocks/routes";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
 import { ShowcaseLayout } from "../../shared/ui/ShowcaseLayout";
@@ -28,9 +37,16 @@ type RouletteResult = {
   tripTypes: string[];
 };
 
+type RouletteSlice = {
+  color: string;
+  label: string;
+  resultId: string;
+};
+
 const regionOptions: RouletteOption[] = [
   { label: "전국", value: "all" },
   { label: "수도권", value: "capital" },
+  { label: "대전", value: "daejeon" },
   { label: "부산", value: "busan" },
   { label: "강원", value: "gangwon" },
   { label: "제주", value: "jeju" },
@@ -50,88 +66,32 @@ const tripTypeOptions: RouletteOption[] = [
   { label: "1박 2일", value: "overnight" },
 ];
 
-const rouletteResults: RouletteResult[] = [
-  {
-    id: "roulette-daejeon-001",
-    title: "대전 성심당!",
-    subtitle: "성심당 튀김소보로",
-    description:
-      "대전 대표 빵집. 튀김소보로와 부추빵이 유명해요. 당일치기로 딱 좋아요.",
-    location: "대전 중구 · 맛집",
-    region: "all",
-    themes: ["all", "food", "healing"],
-    tripTypes: ["oneday", "overnight"],
-    imageEmoji: "🥐",
-  },
-  {
-    id: "roulette-busan-001",
-    title: "광안리 해수욕장!",
-    subtitle: "광안리 야경 산책",
-    description:
-      "해 질 무렵 바다와 브리지 뷰를 함께 볼 수 있어요. 가볍게 산책하기 좋아요.",
-    location: "부산 수영구 · 명소",
-    region: "busan",
-    themes: ["all", "spot", "healing"],
-    tripTypes: ["oneday", "overnight"],
-    imageEmoji: "🌊",
-  },
-  {
-    id: "roulette-gangwon-001",
-    title: "속초 영금정!",
-    subtitle: "동해 일출 포인트",
-    description:
-      "일출 시간대가 특히 아름다운 포인트예요. 근처 물회 코스까지 함께 즐기기 좋아요.",
-    location: "강원 속초 · 명소",
-    region: "gangwon",
-    themes: ["all", "spot"],
-    tripTypes: ["oneday", "overnight"],
-    imageEmoji: "🌅",
-  },
-  {
-    id: "roulette-jeju-001",
-    title: "제주 흑돼지!",
-    subtitle: "오션뷰 구이 스팟",
-    description:
-      "고기와 풍경을 같이 즐길 수 있는 제주 대표 코스예요. 여행 첫날 식사로도 잘 맞아요.",
-    location: "제주시 · 맛집",
-    region: "jeju",
-    themes: ["all", "food"],
-    tripTypes: ["oneday", "overnight"],
-    imageEmoji: "🥩",
-  },
-  {
-    id: "roulette-capital-001",
-    title: "서울 한강 피크닉!",
-    subtitle: "노을 산책 코스",
-    description:
-      "준비 부담 없이 가볍게 나가기 좋은 도심 코스예요. 커피 한 잔 들고 바로 이동하기 좋아요.",
-    location: "서울 여의도 · 루트",
-    region: "capital",
-    themes: ["all", "route", "healing"],
-    tripTypes: ["oneday"],
-    imageEmoji: "🧺",
-  },
-  {
-    id: "roulette-jeolla-001",
-    title: "전주 한옥마을!",
-    subtitle: "먹거리와 산책 코스",
-    description:
-      "한옥 골목, 길거리 음식, 가벼운 산책이 한 번에 이어지는 대표적인 당일 코스예요.",
-    location: "전북 전주 · 루트",
-    region: "jeolla",
-    themes: ["all", "route", "spot"],
-    tripTypes: ["oneday", "overnight"],
-    imageEmoji: "🏘",
-  },
-];
-
-const rouletteSlices = rouletteResults.map((result, index) => ({
-  label: result.subtitle.split(" ")[0],
-  color: ["#9ee0d3", "#d9d3ff", "#c8efe9", "#ffe2d5", "#ffd28a", "#9b92f7"][
-    index
-  ],
-  resultId: result.id,
+const rouletteResults: RouletteResult[] = getMockRouletteRoutes().map((route) => ({
+  id: route.routeId,
+  title: route.title,
+  subtitle: route.subtitle,
+  description: route.description,
+  location: route.location,
+  region: route.region,
+  themes: route.themes,
+  tripTypes: route.tripTypes,
+  imageEmoji: route.imageEmoji,
 }));
+
+const rouletteColors = [
+  "#9ee0d3",
+  "#d9d3ff",
+  "#c8efe9",
+  "#ffe2d5",
+  "#ffd28a",
+  "#9b92f7",
+  "#ffd9ca",
+  "#abd3f5",
+  "#ccebe5",
+  "#ffb79d",
+  "#efe1ff",
+  "#f5d8a8",
+] as const;
 
 const tabItems = [
   { icon: "⌂", label: "홈", href: buildPath.home(), active: false },
@@ -139,6 +99,14 @@ const tabItems = [
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: true },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
 ];
+
+function createRouletteSlices(results: RouletteResult[]) {
+  return results.map((result, index) => ({
+    label: result.title.replace(" 루트", "").slice(0, 6),
+    color: rouletteColors[index % rouletteColors.length],
+    resultId: result.id,
+  })) satisfies RouletteSlice[];
+}
 
 function RouletteChip({
   active,
@@ -168,10 +136,25 @@ function RouletteChip({
 function RouletteWheel({
   isSpinning,
   pointerRotation,
+  slices,
 }: {
   isSpinning: boolean;
   pointerRotation: number;
+  slices: RouletteSlice[];
 }) {
+  const gradient = useMemo(() => {
+    const sliceAngle = 360 / slices.length;
+
+    return `conic-gradient(${slices
+      .map((slice, index) => {
+        const start = index * sliceAngle;
+        const end = (index + 1) * sliceAngle;
+
+        return `${slice.color} ${start}deg ${end}deg`;
+      })
+      .join(",")})`;
+  }, [slices]);
+
   return (
     <div className="relative mx-auto mt-6 h-52 w-52">
       <div
@@ -189,22 +172,19 @@ function RouletteWheel({
 
       <div
         className="flex h-full w-full items-center justify-center rounded-full"
-        style={{
-          background:
-            "conic-gradient(#9ee0d3 0deg 60deg,#d9d3ff 60deg 120deg,#c8efe9 120deg 180deg,#ffe2d5 180deg 240deg,#ffd28a 240deg 300deg,#9b92f7 300deg 360deg)",
-        }}
+        style={{ background: gradient }}
       >
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-[#7b68f0] shadow-[0_8px_18px_rgba(95,81,213,0.12)]">
           GO!
         </div>
       </div>
-      {rouletteSlices.map((slice, index) => {
-        const angle = index * 60 + 30;
+      {slices.map((slice, index) => {
+        const angle = index * (360 / slices.length) + 360 / slices.length / 2;
 
         return (
           <span
             key={slice.label}
-            className="absolute top-1/2 left-1/2 text-[10px] font-semibold text-slate-600"
+            className="absolute top-1/2 left-1/2 text-[9px] font-semibold text-slate-600"
             style={{
               transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-78px) rotate(${-angle}deg)`,
             }}
@@ -224,8 +204,11 @@ function RoulettePhone() {
   const [selectedTripType, setSelectedTripType] = useState("oneday");
   const [pointerRotation, setPointerRotation] = useState(0);
   const [activeResultId, setActiveResultId] = useState(rouletteResults[0].id);
+  const [isSavingRoute, setIsSavingRoute] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const spinTimeoutRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const customRoutes = useCustomRoutes();
 
   const availableResults = useMemo(() => {
     return rouletteResults.filter((result) => {
@@ -238,6 +221,11 @@ function RoulettePhone() {
     });
   }, [selectedRegion, selectedTheme, selectedTripType]);
 
+  const availableSlices = useMemo(
+    () => createRouletteSlices(availableResults),
+    [availableResults],
+  );
+
   const activeResult = useMemo(() => {
     return (
       rouletteResults.find((result) => result.id === activeResultId) ??
@@ -245,6 +233,10 @@ function RoulettePhone() {
       rouletteResults[0]
     );
   }, [activeResultId, availableResults]);
+  const savedRoute = useMemo(
+    () => getCustomRouteBySourceRouteId(Number(activeResult.id)),
+    [activeResult.id, customRoutes],
+  );
 
   useEffect(() => {
     return () => {
@@ -258,6 +250,10 @@ function RoulettePhone() {
   }, []);
 
   const spinRoulette = () => {
+    if (availableResults.length === 0) {
+      return;
+    }
+
     if (spinTimeoutRef.current) {
       window.clearTimeout(spinTimeoutRef.current);
     }
@@ -265,14 +261,12 @@ function RoulettePhone() {
       window.cancelAnimationFrame(animationFrameRef.current);
     }
 
-    const candidatePool =
-      availableResults.length > 0 ? availableResults : rouletteResults;
     const nextResult =
-      candidatePool[Math.floor(Math.random() * candidatePool.length)];
-    const nextSliceIndex = rouletteSlices.findIndex(
+      availableResults[Math.floor(Math.random() * availableResults.length)];
+    const nextSliceIndex = availableSlices.findIndex(
       (slice) => slice.resultId === nextResult.id,
     );
-    const sliceAngle = 360 / rouletteSlices.length;
+    const sliceAngle = 360 / availableSlices.length;
     const targetSliceCenter = nextSliceIndex * sliceAngle + sliceAngle / 2;
     const extraTurns = 360 * (4 + Math.floor(Math.random() * 3));
     const targetRotation = extraTurns + targetSliceCenter;
@@ -285,9 +279,38 @@ function RoulettePhone() {
 
     spinTimeoutRef.current = window.setTimeout(() => {
       setActiveResultId(nextResult.id);
+      setSaveMessage(null);
       setStage("result");
       spinTimeoutRef.current = null;
     }, 3200);
+  };
+
+  const handleSaveRoute = async () => {
+    const sourceRouteId = Number(activeResult.id);
+
+    if (!Number.isFinite(sourceRouteId)) {
+      return;
+    }
+
+    if (savedRoute) {
+      navigateTo(`${buildPath.collection()}#route`);
+      return;
+    }
+
+    setIsSavingRoute(true);
+    setSaveMessage(null);
+
+    try {
+      const routeDetail = await getRouteDetail(sourceRouteId);
+      saveRouteDetailAsCustomRoute(routeDetail, sourceRouteId);
+      setSaveMessage("소장함 루트에 담았어요.");
+      navigateTo(`${buildPath.collection()}#route`);
+    } catch (error) {
+      console.error("Failed to save roulette route", error);
+      setSaveMessage("루트를 소장함에 담지 못했어요.");
+    } finally {
+      setIsSavingRoute(false);
+    }
   };
 
   return (
@@ -314,6 +337,9 @@ function RoulettePhone() {
               </p>
               <p className="mt-2 text-center text-[13px] leading-5 text-slate-500">
                 룰렛에게 맡겨봐요
+              </p>
+              <p className="mt-4 text-center text-[12px] font-medium text-[#5f51d5]">
+                현재 조건에 맞는 루트 {availableResults.length}개
               </p>
             </div>
 
@@ -368,8 +394,41 @@ function RoulettePhone() {
               </div>
             </section>
 
+            {availableResults.length > 0 ? (
+              <div className="mt-6 rounded-[22px] border border-[#e8e0d8] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(99,75,43,0.04)]">
+                <p className="text-[12px] font-semibold text-slate-500">
+                  후보 미리보기
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {availableResults.map((result) => (
+                    <span
+                      key={result.id}
+                      className="rounded-full bg-[#f7f1e8] px-3 py-1.5 text-[11px] font-medium text-slate-700"
+                    >
+                      {result.title.replace(" 루트", "")}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-[22px] border border-[#f3d6cf] bg-[#fff4f1] px-4 py-5 text-center">
+                <p className="text-[14px] font-semibold text-slate-900">
+                  조건에 맞는 루트가 없어요
+                </p>
+                <p className="mt-2 text-[12px] leading-5 text-slate-500">
+                  지역이나 테마를 조금 넓히면 후보가 다시 보여요.
+                </p>
+              </div>
+            )}
+
             <button
-              className="mt-8 w-full rounded-2xl bg-[#5f51d5] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(95,81,213,0.24)]"
+              className={[
+                "mt-8 w-full rounded-2xl px-4 py-3.5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(95,81,213,0.24)]",
+                availableResults.length > 0
+                  ? "bg-[#5f51d5]"
+                  : "cursor-not-allowed bg-slate-300 shadow-none",
+              ].join(" ")}
+              disabled={availableResults.length === 0}
               type="button"
               onClick={spinRoulette}
             >
@@ -380,7 +439,11 @@ function RoulettePhone() {
 
         {stage === "spinning" ? (
           <div className="flex flex-1 flex-col items-center justify-center">
-            <RouletteWheel isSpinning pointerRotation={pointerRotation} />
+            <RouletteWheel
+              isSpinning
+              pointerRotation={pointerRotation}
+              slices={availableSlices}
+            />
             <p className="mt-6 text-[13px] text-slate-500">
               화살표가 멈출 때 당첨 장소가 정해져요
             </p>
@@ -417,17 +480,32 @@ function RoulettePhone() {
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <RouteLink
                     className="flex items-center justify-center rounded-2xl bg-[#f5f1ff] px-3 py-3 text-sm font-semibold text-[#5f51d5]"
-                    href={buildPath.contentDetail(activeResult.id)}
+                    href={buildPath.routeResult(activeResult.id)}
                   >
-                    상세 보기
+                    루트 보기
                   </RouteLink>
-                  <RouteLink
-                    className="flex items-center justify-center rounded-2xl border border-[#ece3d9] px-3 py-3 text-sm font-semibold text-slate-700"
-                    href={buildPath.collection()}
+                  <button
+                    className={[
+                      "flex items-center justify-center rounded-2xl border px-3 py-3 text-sm font-semibold transition",
+                      savedRoute
+                        ? "border-[#d8d0ff] bg-[#f5f1ff] text-[#5f51d5]"
+                        : "border-[#ece3d9] text-slate-700",
+                    ].join(" ")}
+                    disabled={isSavingRoute}
+                    type="button"
+                    onClick={() => {
+                      void handleSaveRoute();
+                    }}
                   >
-                    ♡ 소장
-                  </RouteLink>
+                    {savedRoute ? "♡ 소장한 루트" : isSavingRoute ? "저장 중..." : "♡ 소장"}
+                  </button>
                 </div>
+
+                {saveMessage ? (
+                  <p className="mt-3 text-[12px] font-medium text-[#5f51d5]">
+                    {saveMessage}
+                  </p>
+                ) : null}
               </div>
             </div>
 

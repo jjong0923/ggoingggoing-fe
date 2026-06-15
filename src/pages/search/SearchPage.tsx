@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
+import { logout } from "../../shared/apis/auth";
 import { getContents } from "../../shared/apis/contents";
 import {
   clearAuthSession,
@@ -61,6 +62,12 @@ const categoryTone: Record<ResultCard["category"], string> = {
   루트: "bg-[#eaf3ff] text-[#3880d7]",
 };
 
+const categorySurface: Record<ResultCard["category"], string> = {
+  맛집: "from-[#ffcfbf] via-[#ffb697] to-[#ffd77a]",
+  명소: "from-[#a9e4d8] via-[#75d7c4] to-[#c8d3ff]",
+  루트: "from-[#b8cfff] via-[#95b7ff] to-[#d9ccff]",
+};
+
 type FilterChipProps = {
   active: boolean;
   children: string;
@@ -99,6 +106,18 @@ function mapContentToResultCard(content: ContentSummary): ResultCard {
     viewCount: content.viewCount,
     hot: content.hot,
   };
+}
+
+function getStageTitle(stage: SearchStage) {
+  if (stage === "home") {
+    return "탐색하고 싶은 분위기를 바로 좁혀보세요";
+  }
+
+  if (stage === "filters") {
+    return "지역과 테마를 조합해서 취향에 맞게 좁혀보세요";
+  }
+
+  return "조건에 맞는 결과를 한 번에 모아봤어요";
 }
 
 function sortResults(
@@ -270,62 +289,90 @@ function SearchPhone() {
   return (
     <PhoneFrame className="max-h-[850px] max-w-[430px]">
       <div className="flex h-[min(80vh,770px)] min-h-[650px] flex-col overflow-hidden">
-        <header className="flex w-full items-center gap-3">
-          <button
-            aria-label="뒤로가기"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-slate-700 transition hover:bg-[#f8f4ee]"
-            type="button"
-            onClick={() =>
-              stage === "home" ? navigateTo(buildPath.home()) : setStage("home")
-            }
-          >
-            ←
-          </button>
+        <div className="rounded-[30px] bg-[linear-gradient(135deg,rgba(229,224,255,0.92)_0%,rgba(255,246,232,0.92)_54%,rgba(215,238,255,0.88)_100%)] px-4 py-4 shadow-[0_18px_40px_rgba(110,84,47,0.08)]">
+          <p className="text-[11px] font-semibold tracking-[0.28em] text-[#6f68eb] uppercase">
+            Search Flow
+          </p>
+          <p className="mt-2 text-[21px] font-semibold tracking-[-0.05em] text-slate-900">
+            {stage === "home"
+              ? "검색"
+              : stage === "filters"
+                ? "필터"
+                : "검색 결과"}
+          </p>
+          <p className="mt-2 text-[13px] leading-5 text-slate-500">
+            {getStageTitle(stage)}
+          </p>
 
-          <div className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[22px] bg-[#f8f5ef] px-4">
-            <SearchIcon className="h-[18px] w-[18px] shrink-0 text-slate-400" />
-            <input
-              className="min-w-0 flex-1 border-none bg-transparent text-[15px] font-medium text-slate-900 outline-none"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="지역, 맛집, 명소 검색"
-            />
-            {stage === "filters" ? (
-              <button
-                aria-label="검색어 지우기"
-                className="text-base text-slate-400"
-                type="button"
-                onClick={() => setKeyword("")}
-              >
-                ×
-              </button>
-            ) : null}
-          </div>
+          <header className="mt-4 flex w-full items-center gap-3">
+            <button
+              aria-label="뒤로가기"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-slate-700 transition hover:bg-[#f8f4ee]"
+              type="button"
+              onClick={() =>
+                stage === "home"
+                  ? navigateTo(buildPath.home())
+                  : setStage("home")
+              }
+            >
+              ←
+            </button>
 
-          <button
-            aria-label="필터 열기"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[20px] text-[#5f51d5] transition hover:bg-[#f6f1ff]"
-            type="button"
-            onClick={() =>
-              setStage(stage === "filters" ? "results" : "filters")
-            }
-          >
-            <SlidersIcon className="h-[19px] w-[19px]" />
-          </button>
-        </header>
+            <div className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[22px] border border-white/80 bg-white/90 px-4 shadow-[0_10px_24px_rgba(95,81,213,0.08)]">
+              <SearchIcon className="h-[18px] w-[18px] shrink-0 text-slate-400" />
+              <input
+                className="min-w-0 flex-1 border-none bg-transparent text-[15px] font-medium text-slate-900 outline-none"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="가고 싶은 지역이나 장소를 검색해보세요"
+              />
+              {stage === "filters" ? (
+                <button
+                  aria-label="검색어 지우기"
+                  className="text-base text-slate-400"
+                  type="button"
+                  onClick={() => setKeyword("")}
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+
+            <button
+              aria-label="필터 열기"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/85 text-[20px] text-[#5f51d5] shadow-[0_10px_24px_rgba(95,81,213,0.08)] transition hover:bg-[#f6f1ff]"
+              type="button"
+              onClick={() =>
+                setStage(stage === "filters" ? "results" : "filters")
+              }
+            >
+              <SlidersIcon className="h-[19px] w-[19px]" />
+            </button>
+          </header>
+        </div>
 
         {stage === "home" ? (
-          <div className="no-scrollbar mt-6 flex-1 overflow-y-auto">
-            <section>
-              <h2 className="text-sm font-semibold text-slate-700">
-                최근 검색
-              </h2>
+          <div className="no-scrollbar mt-5 flex-1 overflow-y-auto pr-1">
+            <section className="rounded-[26px] border border-[#ece4da] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(98,76,44,0.06)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[18px] font-semibold tracking-[-0.04em] text-slate-900">
+                    최근 검색
+                  </h2>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    방금 보던 키워드부터 다시 이어서 볼 수 있어요
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#f3efff] px-3 py-1 text-[11px] font-semibold text-[#6a5fe0]">
+                  QUICK
+                </span>
+              </div>
               {recentSearches.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   {recentSearches.map((item) => (
                     <button
                       key={item}
-                      className="rounded-full bg-[#f7f1e8] px-4 py-2 text-[13px] text-slate-600"
+                      className="rounded-full border border-[#ece3ff] bg-[#f7f5ff] px-4 py-2.5 text-[13px] font-medium text-[#5f51d5] transition hover:bg-[#f0ebff]"
                       type="button"
                       onClick={() => {
                         setKeyword(item);
@@ -343,21 +390,60 @@ function SearchPhone() {
               )}
             </section>
 
-            <section className="mt-7 pt-5">
-              <h2 className="text-sm font-semibold text-slate-700">
-                인기 검색어
-              </h2>
-              <ol className="mt-3 space-y-3">
+            <section className="mt-4 rounded-[26px] border border-[#ece4da] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(98,76,44,0.06)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[18px] font-semibold tracking-[-0.04em] text-slate-900">
+                    인기 검색어
+                  </h2>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    지금 많이 찾는 여행 키워드를 바로 눌러볼 수 있어요
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#fff1ea] px-3 py-1 text-[11px] font-semibold text-[#ea8356]">
+                  TREND
+                </span>
+              </div>
+              <ol className="mt-4 space-y-2.5">
                 {trendingKeywords.map((item, index) => (
                   <li
                     key={item}
-                    className="flex items-center gap-3 text-[15px]"
+                    className="rounded-[18px] bg-[#fcfaf6] px-3 py-3"
                   >
-                    <span className="w-4 text-center font-semibold text-[#5f51d5]">
-                      {index + 1}
-                    </span>
                     <button
-                      className="text-left text-slate-700"
+                      className="flex w-full items-center gap-3 text-left"
+                      type="button"
+                      onClick={() => {
+                        setKeyword(item);
+                        setStage("results");
+                      }}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f1eeff] text-[13px] font-semibold text-[#5f51d5]">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 text-[15px] font-medium text-slate-800">
+                        {item}
+                      </span>
+                      <span className="text-[16px] text-slate-300">→</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="mt-4 rounded-[26px] bg-[linear-gradient(135deg,#1d2033_0%,#403a86_55%,#7a6ef5_100%)] px-4 py-5 text-white shadow-[0_20px_36px_rgba(48,40,106,0.24)]">
+              <p className="text-[11px] font-semibold tracking-[0.24em] text-white/70 uppercase">
+                Curated Picks
+              </p>
+              <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.04em]">
+                이런 조합으로 많이 찾고 있어요
+              </h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {["부산 바다", "강릉 카페", "전주 한옥마을", "제주 자연"].map(
+                  (item) => (
+                    <button
+                      key={item}
+                      className="rounded-full bg-white/14 px-3.5 py-2 text-[12px] font-medium text-white transition hover:bg-white/20"
                       type="button"
                       onClick={() => {
                         setKeyword(item);
@@ -366,18 +452,25 @@ function SearchPhone() {
                     >
                       {item}
                     </button>
-                  </li>
-                ))}
-              </ol>
+                  ),
+                )}
+              </div>
             </section>
           </div>
         ) : null}
 
         {stage === "filters" ? (
           <div className="no-scrollbar mt-5 flex-1 overflow-y-auto pr-1">
-            <section>
-              <h2 className="text-sm font-semibold text-slate-700">지역</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
+            <section className="rounded-[26px] border border-[#ece4da] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(98,76,44,0.06)]">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-[16px] font-semibold text-slate-900">
+                  지역
+                </h2>
+                <span className="text-[11px] font-medium text-slate-400">
+                  {selectedRegions.length}개 선택
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
                 {regionOptions.map((option) => (
                   <FilterChip
                     key={option}
@@ -392,9 +485,16 @@ function SearchPhone() {
               </div>
             </section>
 
-            <section className="mt-6">
-              <h2 className="text-sm font-semibold text-slate-700">테마</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
+            <section className="mt-4 rounded-[26px] border border-[#ece4da] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(98,76,44,0.06)]">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-[16px] font-semibold text-slate-900">
+                  테마
+                </h2>
+                <span className="text-[11px] font-medium text-slate-400">
+                  {selectedThemes.length}개 선택
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
                 {themeOptions.map((option) => (
                   <FilterChip
                     key={option}
@@ -409,11 +509,16 @@ function SearchPhone() {
               </div>
             </section>
 
-            <section className="mt-6">
-              <h2 className="text-sm font-semibold text-slate-700">
-                여행 유형
-              </h2>
-              <div className="mt-3 flex flex-wrap gap-2">
+            <section className="mt-4 rounded-[26px] border border-[#ece4da] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(98,76,44,0.06)]">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-[16px] font-semibold text-slate-900">
+                  여행 유형
+                </h2>
+                <span className="text-[11px] font-medium text-slate-400">
+                  {selectedTypes.length}개 선택
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
                 {typeOptions.map((option) => (
                   <FilterChip
                     key={option}
@@ -428,9 +533,9 @@ function SearchPhone() {
               </div>
             </section>
 
-            <div className="mt-8 flex items-center justify-between pt-4">
+            <div className="sticky bottom-0 mt-5 grid grid-cols-2 gap-3 bg-[linear-gradient(180deg,rgba(249,245,239,0)_0%,rgba(249,245,239,0.94)_28%,rgba(249,245,239,1)_100%)] pt-6">
               <button
-                className="rounded-xl bg-[#f7f1e8] px-4 py-2 text-[13px] font-medium text-slate-600"
+                className="rounded-[18px] border border-[#e4dbcf] bg-white px-4 py-3 text-[13px] font-medium text-slate-600"
                 type="button"
                 onClick={() => {
                   setSelectedRegions([]);
@@ -441,7 +546,7 @@ function SearchPhone() {
                 초기화
               </button>
               <button
-                className="rounded-xl bg-[#5f51d5] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(95,81,213,0.24)]"
+                className="rounded-[18px] bg-[#5f51d5] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(95,81,213,0.24)]"
                 type="button"
                 onClick={() => setStage("results")}
               >
@@ -453,27 +558,48 @@ function SearchPhone() {
 
         {stage === "results" ? (
           <div className="no-scrollbar mt-5 flex-1 overflow-y-auto pr-1">
-            <div className="flex flex-wrap gap-2">
-              {appliedFilters.map((filter) => (
+            <section className="rounded-[26px] border border-[#ece4da] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(98,76,44,0.06)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#6f68eb] uppercase">
+                    Result Summary
+                  </p>
+                  <p className="mt-2 text-[18px] font-semibold tracking-[-0.04em] text-slate-900">
+                    {isLoadingResults
+                      ? "검색 중..."
+                      : `결과 ${sortedResults.length}개`}
+                  </p>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    {keyword.trim()
+                      ? `"${keyword}" 관련 결과를 정리했어요.`
+                      : "필터 조건에 맞는 결과를 모았어요."}
+                  </p>
+                </div>
                 <button
-                  key={filter}
-                  className="rounded-full bg-[#f1eeff] px-3 py-1.5 text-[11px] font-medium text-[#5f51d5]"
+                  className="rounded-full bg-[#f3efff] px-3 py-1.5 text-[11px] font-semibold text-[#5f51d5]"
                   type="button"
+                  onClick={() => setStage("filters")}
                 >
-                  {filter} ×
+                  필터 수정
                 </button>
-              ))}
-            </div>
+              </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-[13px] font-medium text-slate-600">
-                {isLoadingResults
-                  ? "검색 중..."
-                  : `결과 ${sortedResults.length}개`}
-              </p>
-            </div>
+              {appliedFilters.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {appliedFilters.map((filter) => (
+                    <button
+                      key={filter}
+                      className="rounded-full bg-[#f1eeff] px-3 py-1.5 text-[11px] font-medium text-[#5f51d5]"
+                      type="button"
+                    >
+                      {filter} ×
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </section>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {sortOptions.map((option) => (
                 <button
                   key={option}
@@ -497,9 +623,9 @@ function SearchPhone() {
               </div>
             ) : null}
 
-            <div className="mt-5 space-y-2">
+            <div className="mt-4 space-y-3">
               {!isLoadingResults && sortedResults.length === 0 ? (
-                <div className="rounded-[18px] bg-white px-4 py-10 text-center text-[14px] text-slate-500 shadow-[0_8px_20px_rgba(99,75,43,0.04)]">
+                <div className="rounded-[22px] bg-white px-4 py-10 text-center text-[14px] text-slate-500 shadow-[0_8px_20px_rgba(99,75,43,0.04)]">
                   조건에 맞는 검색 결과가 없어요.
                 </div>
               ) : null}
@@ -507,34 +633,49 @@ function SearchPhone() {
               {sortedResults.map((card) => (
                 <RouteLink
                   key={card.id}
-                  className="flex items-center gap-3 rounded-[18px] bg-white px-3 py-3 shadow-[0_8px_20px_rgba(99,75,43,0.04)]"
+                  className="overflow-hidden rounded-[24px] border border-[#ebe3d8] bg-white shadow-[0_12px_28px_rgba(99,75,43,0.06)]"
                   href={buildPath.contentDetail(card.id)}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ece7df] text-sm font-semibold text-slate-700">
-                    {card.title.slice(0, 2)}
+                  <div
+                    className={[
+                      "flex h-28 items-center justify-between bg-gradient-to-br px-4 py-4",
+                      categorySurface[card.category],
+                    ].join(" ")}
+                  >
+                    <div>
+                      <span
+                        className={[
+                          "inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                          categoryTone[card.category],
+                        ].join(" ")}
+                      >
+                        {card.category}
+                      </span>
+                      <h3 className="mt-3 text-[20px] font-semibold tracking-[-0.04em] text-white">
+                        {card.title}
+                      </h3>
+                    </div>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-white/20 text-[18px] font-semibold text-white backdrop-blur-sm">
+                      {card.title.slice(0, 2)}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[14px] font-semibold text-slate-900">
-                      {card.title}
-                    </h3>
-                    <p className="mt-1 text-[12px] text-slate-500">
+                  <div className="px-4 py-4">
+                    <p className="text-[12px] text-slate-500">
                       ⌖ {card.subtitle}
                     </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span
-                      className={[
-                        "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                        categoryTone[card.category],
-                      ].join(" ")}
-                    >
-                      {card.category}
-                    </span>
-                    {card.hot ? (
-                      <span className="text-[10px] font-semibold text-[#ec7e52]">
-                        HOT
-                      </span>
-                    ) : null}
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className="flex flex-wrap gap-2">
+                        {card.hot ? (
+                          <span className="rounded-full bg-[#fff1ea] px-2.5 py-1 text-[10px] font-semibold text-[#ec7e52]">
+                            HOT
+                          </span>
+                        ) : null}
+                        <span className="rounded-full bg-[#f8f4ee] px-2.5 py-1 text-[10px] font-medium text-slate-500">
+                          조회 {card.viewCount}
+                        </span>
+                      </div>
+                      <span className="text-[16px] text-slate-300">→</span>
+                    </div>
                   </div>
                 </RouteLink>
               ))}
