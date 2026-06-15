@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
 import { navigateTo } from "../../shared/lib/router";
+import {
+  SearchIcon,
+  SlidersIcon,
+  UserCircleIcon,
+} from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
 import { ShowcaseLayout } from "../../shared/ui/ShowcaseLayout";
@@ -64,7 +69,12 @@ const tabItems = [
   { icon: "⌕", label: "검색", href: buildPath.search(), active: true },
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: false },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
-  { icon: "◌", label: "MY", href: buildPath.my(), active: false },
+  {
+    icon: <UserCircleIcon className="h-[18px] w-[18px]" />,
+    label: "MY",
+    href: buildPath.my(),
+    active: false,
+  },
 ];
 
 const categoryTone: Record<ResultCard["category"], string> = {
@@ -118,7 +128,7 @@ function SearchPhone() {
   return (
     <PhoneFrame className="max-h-[850px] max-w-[430px]">
       <div className="flex h-[min(80vh,770px)] min-h-[650px] flex-col overflow-hidden">
-        <header className="flex items-center gap-3">
+        <header className="flex w-full items-center gap-3">
           <button
             aria-label="뒤로가기"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-slate-700 transition hover:bg-[#f8f4ee]"
@@ -128,8 +138,8 @@ function SearchPhone() {
             ←
           </button>
 
-          <div className="flex h-12 flex-1 items-center gap-2 rounded-[22px] bg-[#f8f5ef] px-4">
-            <span className="text-[18px] text-slate-400">⌕</span>
+          <div className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[22px] bg-[#f8f5ef] px-4">
+            <SearchIcon className="h-[18px] w-[18px] shrink-0 text-slate-400" />
             <input
               className="min-w-0 flex-1 border-none bg-transparent text-[15px] font-medium text-slate-900 outline-none"
               value={keyword}
@@ -154,7 +164,7 @@ function SearchPhone() {
             type="button"
             onClick={() => setStage(stage === "filters" ? "results" : "filters")}
           >
-            ⚙
+            <SlidersIcon className="h-[19px] w-[19px]" />
           </button>
         </header>
 

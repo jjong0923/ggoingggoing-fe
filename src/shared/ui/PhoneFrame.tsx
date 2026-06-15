@@ -13,8 +13,8 @@ export function PhoneFrame({ children, className }: PhoneFrameProps) {
         className,
       ].join(" ")}
     >
-      <div className="rounded-[32px] bg-white p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-        <div className="rounded-[28px] bg-[linear-gradient(180deg,#ffffff_0%,#fffdf9_100%)] p-5 md:p-6">
+      <div className="overflow-hidden rounded-[32px] bg-[linear-gradient(180deg,#fffdf9_0%,#fffaf3_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+        <div className="px-4 py-4 md:px-5 md:py-5">
           {children}
         </div>
       </div>

@@ -35,7 +35,7 @@ export function AppLayout({
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#fffaf2,white_38%,#f7efe1)] px-4 py-6 text-slate-900 md:px-6">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#fffaf2,white_38%,#f7efe1)] px-4 py-4 text-slate-900 md:px-6 md:py-5">
       <div className="mx-auto flex max-w-6xl flex-col gap-5">
         <header className="rounded-[32px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_70px_rgba(103,80,47,0.12)] backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

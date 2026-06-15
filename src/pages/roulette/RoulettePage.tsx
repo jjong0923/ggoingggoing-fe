@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildPath } from "../../app/router/routePaths";
+import { UserCircleIcon } from "../../shared/ui/AppIcons";
 import { PhoneFrame } from "../../shared/ui/PhoneFrame";
 import { RouteLink } from "../../shared/ui/RouteLink";
 import { ShowcaseLayout } from "../../shared/ui/ShowcaseLayout";
@@ -131,7 +132,12 @@ const tabItems = [
   { icon: "⌕", label: "탐색", href: buildPath.theme(), active: false },
   { icon: "◫", label: "룰렛", href: buildPath.roulette(), active: true },
   { icon: "♡", label: "소장", href: buildPath.collection(), active: false },
-  { icon: "◌", label: "MY", href: buildPath.my(), active: false },
+  {
+    icon: <UserCircleIcon className="h-[18px] w-[18px]" />,
+    label: "MY",
+    href: buildPath.my(),
+    active: false,
+  },
 ];
 
 function RouletteChip({
@@ -172,10 +178,10 @@ function RouletteWheel({
         className="absolute inset-0 z-20 transition-transform duration-[3200ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         style={{ transform: `rotate(${pointerRotation}deg)` }}
       >
-        <div className="absolute left-1/2 top-0 h-9 w-1 -translate-x-1/2 rounded-full bg-[#5f51d5]/30" />
+        <div className="absolute left-1/2 top-3 h-8 w-1 -translate-x-1/2 rounded-full bg-[#5f51d5]/30" />
         <div
           className={[
-            "absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-l-[9px] border-r-[9px] border-b-[18px] border-l-transparent border-r-transparent border-b-[#5f51d5]",
+            "absolute left-1/2 top-3 h-0 w-0 -translate-x-1/2 border-l-[9px] border-r-[9px] border-b-[18px] border-l-transparent border-r-transparent border-b-[#5f51d5]",
             isSpinning ? "opacity-100" : "opacity-100",
           ].join(" ")}
         />
@@ -219,6 +225,7 @@ function RoulettePhone() {
   const [pointerRotation, setPointerRotation] = useState(0);
   const [activeResultId, setActiveResultId] = useState(rouletteResults[0].id);
   const spinTimeoutRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const availableResults = useMemo(() => {
     return rouletteResults.filter((result) => {
@@ -243,12 +250,18 @@ function RoulettePhone() {
       if (spinTimeoutRef.current) {
         window.clearTimeout(spinTimeoutRef.current);
       }
+      if (animationFrameRef.current) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, []);
 
   const spinRoulette = () => {
     if (spinTimeoutRef.current) {
       window.clearTimeout(spinTimeoutRef.current);
+    }
+    if (animationFrameRef.current) {
+      window.cancelAnimationFrame(animationFrameRef.current);
     }
 
     const candidatePool = availableResults.length > 0 ? availableResults : rouletteResults;
@@ -263,11 +276,15 @@ function RoulettePhone() {
     const targetRotation = extraTurns + targetSliceCenter;
 
     setStage("spinning");
-    setPointerRotation((current) => current + targetRotation);
+    animationFrameRef.current = window.requestAnimationFrame(() => {
+      setPointerRotation((current) => current + targetRotation);
+      animationFrameRef.current = null;
+    });
 
     spinTimeoutRef.current = window.setTimeout(() => {
       setActiveResultId(nextResult.id);
       setStage("result");
+      spinTimeoutRef.current = null;
     }, 3200);
   };
 
@@ -396,16 +413,16 @@ function RoulettePhone() {
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <RouteLink
                     className="flex items-center justify-center rounded-2xl bg-[#f5f1ff] px-3 py-3 text-sm font-semibold text-[#5f51d5]"
-                    href={buildPath.routeResult("roulette-route-007")}
+                    href={buildPath.contentDetail(activeResult.id)}
                   >
-                    루트 만들기
+                    상세 보기
                   </RouteLink>
-                  <button
-                    className="rounded-2xl border border-[#ece3d9] px-3 py-3 text-sm font-semibold text-slate-700"
-                    type="button"
+                  <RouteLink
+                    className="flex items-center justify-center rounded-2xl border border-[#ece3d9] px-3 py-3 text-sm font-semibold text-slate-700"
+                    href={buildPath.collection()}
                   >
                     ♡ 소장
-                  </button>
+                  </RouteLink>
                 </div>
               </div>
             </div>

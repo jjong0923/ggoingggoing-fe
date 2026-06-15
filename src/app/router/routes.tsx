@@ -74,6 +74,7 @@ export const appRoutes: AppRoute[] = [
     path: routePaths.contentDetail,
     title: "컨텐츠 상세",
     description: "상세 정보, 추천, 루트/소장 CTA 허브",
+    layout: "immersive",
     render: (params) => <ContentDetailPage contentId={params.contentId} />,
   },
   {
@@ -90,6 +91,7 @@ export const appRoutes: AppRoute[] = [
     path: routePaths.collection,
     title: "소장함",
     description: "찜 콘텐츠와 저장 루트 관리",
+    layout: "immersive",
     showTabBar: true,
     render: () => <CollectionPage />,
   },
